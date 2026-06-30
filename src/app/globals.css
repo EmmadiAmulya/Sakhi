@@ -34,10 +34,10 @@
   --radius-3xl: 2.25rem;
 
   /* Advanced Specular Glass Shadows */
-  --shadow-glass: 0 8px 32px 0 rgba(138, 90, 120, 0.08);
-  --shadow-glass-inset: inset 0 1px 1px 0 rgba(251, 252, 254, 0.45), inset 0 -1px 1px 0 rgba(138, 90, 120, 0.08);
-  --shadow-glass-glow: 0 0 20px rgba(232, 155, 182, 0.15);
-  --shadow-glass-button-inset: inset 0 1px 0 0 rgba(251, 252, 254, 0.4), inset 0 -1px 0 0 rgba(138, 90, 120, 0.15);
+  --shadow-glass: 0 16px 48px 0 rgba(138, 90, 120, 0.06);
+  --shadow-glass-inset: inset 0 1.5px 0px 0 rgba(251, 252, 254, 0.65), inset 0 -1px 1px 0 rgba(138, 90, 120, 0.05);
+  --shadow-glass-glow: 0 0 24px rgba(232, 155, 182, 0.2);
+  --shadow-glass-button-inset: inset 0 1px 0px 0 rgba(251, 252, 254, 0.5), inset 0 -1px 0px 0 rgba(138, 90, 120, 0.12);
 
   /* Z-Index Scale */
   --z-bg: -20;

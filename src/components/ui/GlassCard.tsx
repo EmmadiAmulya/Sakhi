@@ -20,9 +20,9 @@ export default function GlassCard({
   ...props
 }: GlassCardProps) {
   const cardClassName = cn(
-    "rounded-2xl border border-border bg-surface-glass/85 backdrop-blur-lg",
+    "rounded-2xl border border-border/80 bg-gradient-to-tr from-surface-white/35 via-surface-white/15 to-surface-white/50 backdrop-blur-xl saturate-[140%]",
     "shadow-glass shadow-glass-inset liquid-glass-sheen transition-all duration-300",
-    hoverScale && "hover:scale-[1.012] hover:shadow-glass-glow hover:bg-surface-white/60",
+    hoverScale && "hover:scale-[1.012] hover:shadow-glass-glow hover:bg-gradient-to-tr hover:from-surface-white/50 hover:via-surface-white/25 hover:to-surface-white/60",
     className
   );
 
