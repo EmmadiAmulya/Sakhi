@@ -1,0 +1,164 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--font-quicksand), var(--font-sans);
+  --font-serif: var(--font-noto-serif), var(--font-serif);
+  
+  /* Semantic Color Tokens */
+  --color-ink-text: var(--ink-text);
+  --color-ink-soft: var(--ink-soft);
+  --color-sakura: var(--sakura);
+  --color-sakura-deep: var(--sakura-deep);
+  --color-plum: var(--plum);
+  --color-surface-white: var(--surface-white);
+  
+  --color-bg: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-glass: var(--surface-glass);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
+  --color-border: var(--border);
+
+  /* Soft and Generous Radius Scale */
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2.25rem;
+
+  /* Advanced Specular Glass Shadows */
+  --shadow-glass: 0 8px 32px 0 rgba(138, 90, 120, 0.08);
+  --shadow-glass-inset: inset 0 1px 1px 0 rgba(251, 252, 254, 0.45), inset 0 -1px 1px 0 rgba(138, 90, 120, 0.08);
+  --shadow-glass-glow: 0 0 20px rgba(232, 155, 182, 0.15);
+  --shadow-glass-button-inset: inset 0 1px 0 0 rgba(251, 252, 254, 0.4), inset 0 -1px 0 0 rgba(138, 90, 120, 0.15);
+
+  /* Z-Index Scale */
+  --z-bg: -20;
+  --z-scrim: -10;
+  --z-petals: -5;
+  --z-content: 10;
+  --z-nav: 40;
+  --z-modal: 50;
+
+  /* Custom Transitions & Curves */
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+:root {
+  --background: #fbfcfe;
+  --foreground: #3a2b3f;
+
+  /* Sakura Aesthetic Core Colors */
+  --ink-text: #3a2b3f;
+  --ink-soft: #6b5566;
+  --sakura: #e89bb6;
+  --sakura-deep: #d56f96;
+  --plum: #8a5a78;
+  --surface-white: #fbfcfe;
+
+  /* Semantic Variables */
+  --text: #3a2b3f;
+  --text-muted: #6b5566;
+  --surface: rgba(251, 252, 254, 0.65);
+  --surface-glass: rgba(251, 252, 254, 0.4);
+  --accent: #e89bb6;
+  --accent-strong: #d56f96;
+  --ring: #d56f96;
+  --scrim: rgba(251, 252, 254, 0.4);
+  
+  --border: rgba(138, 90, 120, 0.12);
+  --input: rgba(138, 90, 120, 0.08);
+
+  /* shadcn UI Color Bindings */
+  --card: var(--surface-glass);
+  --card-foreground: var(--text);
+  --popover: rgba(251, 252, 254, 0.85);
+  --popover-foreground: var(--text);
+  --primary: var(--accent-strong);
+  --primary-foreground: var(--surface-white);
+  --secondary: rgba(232, 155, 182, 0.15);
+  --secondary-foreground: var(--plum);
+  --muted: rgba(107, 85, 102, 0.08);
+  --muted-foreground: var(--text-muted);
+  --destructive: oklch(0.577 0.245 27.325);
+  
+  --radius: 1rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-bg text-foreground overflow-x-hidden min-h-screen selection:bg-sakura/30 selection:text-plum;
+  }
+  html {
+    @apply h-full;
+  }
+}
+
+/* Custom Specular Sheen Animation for Liquid Glass */
+@keyframes sheen {
+  0% {
+    transform: translateX(-150%) skewX(-15deg);
+  }
+  50% {
+    transform: translateX(150%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(150%) skewX(-15deg);
+  }
+}
+
+.liquid-glass-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-glass-sheen::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(251, 252, 254, 0.15) 30%,
+    rgba(251, 252, 254, 0.3) 50%,
+    rgba(251, 252, 254, 0.15) 70%,
+    transparent
+  );
+  transform: translateX(-150%) skewX(-15deg);
+  transition: none;
+}
+
+.liquid-glass-sheen:hover::after {
+  animation: sheen 1.8s infinite var(--ease-out-soft);
+}
+
+/* Lenis Smooth Scroll Configuration */
+html.lenis {
+  height: auto;
+}
+
+.lenis-smooth {
+  scroll-behavior: initial;
+}
+
+.lenis-smooth [data-lenis-prevent] {
+  overflow: anchor;
+}
+
+.lenis-smooth {
+  min-height: 100vh;
+}
