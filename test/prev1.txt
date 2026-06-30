@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sakhi — Liquid Glass UI Preview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --pink-100:#ffe4ee; --pink-200:#ffc9dd; --pink-400:#ff8fb6;
+    --rose:#e63980; --ink:#5a2a40; --ink-soft:#8a5a70;
+  }
+  body{
+    font-family:'Quicksand',system-ui,sans-serif; min-height:100vh; color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 8% -10%, #ffe9f1 0%, transparent 60%),
+      radial-gradient(1000px 700px at 112% 8%, #ffeaf3 0%, transparent 55%),
+      linear-gradient(160deg,#fff8fb 0%, #ffeef5 45%, #ffe0ec 100%);
+    overflow-x:hidden; display:flex; flex-direction:column; align-items:center;
+    padding:40px 16px 80px;
+  }
+
+  /* ---------- drifting petals ---------- */
+  .petal-layer{position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden;}
+  .petal{position:absolute; top:-6vh;
+    background:radial-gradient(circle at 30% 25%, #ffd9e7 0%, #ff9ec4 70%, #ff7aae 100%);
+    border-radius:150% 0 150% 0; filter:drop-shadow(0 2px 3px rgba(230,57,128,.2));
+    animation:fall linear infinite;}
+  @keyframes fall{
+    0%{transform:translate(0,-6vh) rotate(0deg);}
+    100%{transform:translate(var(--drift),112vh) rotate(720deg);}
+  }
+
+  .wrap{position:relative; z-index:1; width:100%; max-width:900px;}
+  .head{text-align:center; margin-bottom:28px;}
+  .head h1{font-size:30px; font-weight:700; color:var(--rose); letter-spacing:.5px;}
+  .head p{color:var(--ink-soft); margin-top:6px; font-weight:500;}
+  .phones{display:flex; gap:28px; justify-content:center; flex-wrap:wrap;}
+
+  /* ---------- LIQUID GLASS material ---------- */
+  .glass{
+    background:linear-gradient(135deg, rgba(255,255,255,.6), rgba(255,255,255,.26));
+    backdrop-filter:blur(22px) saturate(185%);
+    -webkit-backdrop-filter:blur(22px) saturate(185%);
+    border:1px solid rgba(255,255,255,.65);
+    box-shadow:
+      0 10px 34px rgba(230,57,128,.16),
+      inset 0 1px 1px rgba(255,255,255,.95),
+      inset 0 -3px 10px rgba(255,255,255,.35);
+    position:relative; overflow:hidden;
+  }
+  /* glossy specular sheen across the top */
+  .glass::before{content:""; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 40%);}
+  /* soft moving light highlight = "liquid" feel */
+  .glass::after{content:""; position:absolute; top:-60%; left:-30%; width:80%; height:180%;
+    background:radial-gradient(closest-side, rgba(255,255,255,.5), transparent);
+    transform:rotate(18deg); pointer-events:none; animation:sheen 9s ease-in-out infinite;}
+  @keyframes sheen{0%,100%{transform:translateX(-10%) rotate(18deg);} 50%{transform:translateX(40%) rotate(18deg);}}
+
+  .phone{width:340px; height:680px; border-radius:46px; padding:14px;
+    background:linear-gradient(160deg, rgba(255,255,255,.5), rgba(255,235,243,.35));
+    border:1px solid rgba(255,255,255,.7);
+    box-shadow:0 30px 60px rgba(230,57,128,.22), inset 0 1px 2px rgba(255,255,255,.9);
+    backdrop-filter:blur(10px);}
+  .screen{width:100%; height:100%; border-radius:34px; padding:20px 16px;
+    display:flex; flex-direction:column; gap:14px;}
+
+  .statusbar{display:flex; justify-content:space-between; font-size:12px; color:var(--ink-soft); font-weight:600; padding:2px 6px;}
+  .greet h2{font-size:21px; color:var(--rose);} .greet span{color:var(--ink-soft); font-size:13px; font-weight:500;}
+
+  .card{border-radius:24px; padding:16px;}
+  .cycle{display:flex; align-items:center; gap:14px;}
+  .ring{width:62px;height:62px;border-radius:50%;
+    background:conic-gradient(var(--rose) 0 65%, rgba(255,255,255,.45) 65% 100%);
+    display:grid;place-items:center;}
+  .ring .inner{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.85);
+    display:grid;place-items:center;font-weight:700;color:var(--rose);font-size:12px;}
+  .cycle .t{font-weight:600;} .cycle .s{font-size:12px;color:var(--ink-soft);}
+
+  .label{font-weight:600;font-size:14px;margin-bottom:8px;}
+  .moods{display:flex; justify-content:space-between;}
+  .mood{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:20px;
+    background:linear-gradient(135deg,rgba(255,255,255,.7),rgba(255,220,235,.5));
+    border:1px solid rgba(255,255,255,.7); cursor:pointer; transition:transform .2s;}
+  .mood:hover{transform:translateY(-3px) scale(1.08);}
+  .mood.sel{background:linear-gradient(135deg,var(--pink-400),var(--rose));box-shadow:0 6px 16px rgba(230,57,128,.4);}
+
+  .habits{display:flex;flex-direction:column;gap:9px;}
+  .habit{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;}
+  .check{width:22px;height:22px;border-radius:8px;border:1.5px solid var(--pink-400);
+    display:grid;place-items:center;color:#fff;font-size:13px;}
+  .check.on{background:linear-gradient(135deg,var(--pink-400),var(--rose));border-color:transparent;}
+
+  .nav{margin-top:auto;display:flex;justify-content:space-around;padding:12px;border-radius:26px;}
+  .nav .ico{font-size:20px;opacity:.55;} .nav .ico.act{opacity:1;}
+
+  .bubbles{display:flex;flex-direction:column;gap:10px;flex:1;}
+  .b{max-width:80%;padding:11px 14px;border-radius:20px;font-size:13px;line-height:1.45;}
+  .b.ai{align-self:flex-start;border-bottom-left-radius:6px;
+    background:linear-gradient(135deg,rgba(255,255,255,.78),rgba(255,228,240,.6));
+    border:1px solid rgba(255,255,255,.7);}
+  .b.me{align-self:flex-end;border-bottom-right-radius:6px;color:#fff;
+    background:linear-gradient(135deg,var(--pink-400),var(--rose));}
+  .inputbar{display:flex;gap:8px;align-items:center;padding:8px 8px 8px 16px;border-radius:24px;}
+  .inputbar input{flex:1;border:none;background:transparent;outline:none;font-family:inherit;font-size:13px;color:var(--ink);}
+  .inputbar input::placeholder{color:#c98ba8;}
+  .send{width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;color:#fff;font-size:15px;
+    background:linear-gradient(135deg,var(--pink-400),var(--rose));}
+  .fab{position:absolute;right:24px;bottom:96px;width:56px;height:56px;border-radius:50%;
+    display:grid;place-items:center;font-size:24px;color:#fff;border:1px solid rgba(255,255,255,.6);
+    background:linear-gradient(135deg,var(--pink-400),var(--rose));
+    box-shadow:0 10px 26px rgba(230,57,128,.4), inset 0 1px 2px rgba(255,255,255,.85);}
+</style>
+</head>
+<body>
+  <div class="petal-layer" id="petals"></div>
+  <div class="wrap">
+    <div class="head">
+      <h1>🌸 Sakhi</h1>
+      <p>Liquid-glass UI preview · sakura theme</p>
+    </div>
+    <div class="phones">
+
+      <!-- HOME -->
+      <div class="phone">
+        <div class="screen glass">
+          <div class="statusbar"><span>9:41</span><span>🔋 100%</span></div>
+          <div class="greet"><h2>Good morning, Maya</h2><span>Monday, 29 June</span></div>
+          <div class="glass card cycle">
+            <div class="ring"><div class="inner">Day 14</div></div>
+            <div><div class="t">Ovulation phase</div><div class="s">Next period in 14 days</div></div>
+          </div>
+          <div class="glass card">
+            <div class="label">How are you feeling?</div>
+            <div class="moods">
+              <div class="mood">😣</div><div class="mood">😕</div>
+              <div class="mood sel">🙂</div><div class="mood">😌</div><div class="mood">🥰</div>
+            </div>
+          </div>
+          <div class="glass card">
+            <div class="label">Today's habits</div>
+            <div class="habits">
+              <div class="habit"><span class="check on">✓</span> Drink 2L water</div>
+              <div class="habit"><span class="check on">✓</span> 10 min walk</div>
+              <div class="habit"><span class="check"></span> Take iron supplement</div>
+            </div>
+          </div>
+          <div class="glass nav">
+            <span class="ico act">🏠</span><span class="ico">📅</span><span class="ico">📖</span><span class="ico">⚙️</span>
+          </div>
+          <div class="fab">💬</div>
+        </div>
+      </div>
+
+      <!-- CHAT -->
+      <div class="phone">
+        <div class="screen glass">
+          <div class="statusbar"><span>9:42</span><span>🔋 100%</span></div>
+          <div class="greet"><h2>🌸 Talk to Sakhi</h2><span>Your companion</span></div>
+          <div class="bubbles">
+            <div class="b ai">Hi Maya 💕 How are you feeling today?</div>
+            <div class="b me">A bit anxious about my exams</div>
+            <div class="b ai">That's completely understandable. Want to try a short breathing exercise together, or just talk it through?</div>
+            <div class="b me">Let's talk</div>
+            <div class="b ai">I'm right here for you. What's weighing on you most right now?</div>
+          </div>
+          <div class="glass inputbar">
+            <input placeholder="Share what's on your mind…" />
+            <button class="send">➤</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  const layer = document.getElementById('petals');
+  for (let i = 0; i < 26; i++) {
+    const p = document.createElement('div');
+    p.className = 'petal';
+    const size = 8 + Math.random() * 12;
+    p.style.left = Math.random() * 100 + 'vw';
+    p.style.width = p.style.height = size + 'px';
+    p.style.setProperty('--drift', (Math.random() * 200 - 100) + 'px');
+    p.style.animationDuration = (7 + Math.random() * 9) + 's';
+    p.style.animationDelay = (-Math.random() * 12) + 's';
+    p.style.opacity = (0.5 + Math.random() * 0.45).toFixed(2);
+    layer.appendChild(p);
+  }
+</script>
+</body>
+</html>

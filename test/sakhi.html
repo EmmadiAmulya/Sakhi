@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sakhi — Sakura</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;600&family=Quicksand:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* >>> Change this line if your image has a different name <<< */
+      --bg-image: url('sakura-bg.png');
+      --ink: #3a2b3f;
+      --ink-soft: #6b5566;
+      --sakura: #e89bb6;
+      --sakura-deep: #d56f96;
+      --plum: #8a5a78;
+    }
+
+    * { box-sizing: border-box; }
+    body { font-family: 'Quicksand', system-ui, sans-serif; color: var(--ink); margin: 0; }
+    .serif { font-family: 'Noto Serif JP', serif; }
+
+    /* ---------- LIVING BACKGROUND ---------- */
+    .bg-stage {
+      position: fixed;
+      inset: -4%;                 /* overscan so sway never shows edges */
+      z-index: -3;
+      background-image: var(--bg-image);
+      background-size: cover;
+      background-position: center;
+      /* graceful fallback if the image is missing */
+      background-color: #f3d9e4;
+      animation: canopy-breeze 11s ease-in-out infinite alternate;
+      transform-origin: 50% 40%;
+      will-change: transform;
+    }
+    @keyframes canopy-breeze {
+      0%   { transform: scale(1.04) translate(0, 0); }
+      50%  { transform: scale(1.06) translate(-0.8%, 0.3%); }
+      100% { transform: scale(1.04) translate(0.8%, -0.3%); }
+    }
+
+    /* readability veil so glass UI stays legible over the photo */
+    .bg-veil {
+      position: fixed; inset: 0; z-index: -2; pointer-events: none;
+      background:
+        radial-gradient(1200px 700px at 50% 30%, rgba(255,255,255,0.18), transparent 70%),
+        linear-gradient(180deg, rgba(255,247,250,0.35) 0%, rgba(255,240,247,0.55) 100%);
+    }
+
+    /* swaying decorative branches in the corners */
+    .branch { position: fixed; z-index: -1; pointer-events: none; opacity: 0.92; }
+    .branch.left  { top: -10px; left: -20px; transform-origin: top left;  animation: sway-l 7s ease-in-out infinite alternate; }
+    .branch.right { top: -10px; right: -20px; transform-origin: top right; animation: sway-r 8.5s ease-in-out infinite alternate; }
+    @keyframes sway-l { 0% { transform: rotate(-1.2deg); } 100% { transform: rotate(2deg); } }
+    @keyframes sway-r { 0% { transform: rotate(1.2deg); } 100% { transform: rotate(-2deg); } }
+
+    /* ---------- PETALS ---------- */
+    .petal-field { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
+    .petal {
+      position: absolute;
+      top: -8vh;
+      will-change: transform;
+      animation-name: petal-fall;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+    .petal > span {           /* inner element handles flutter/spin */
+      display: block;
+      width: 100%; height: 100%;
+      animation: petal-flutter 3.2s ease-in-out infinite;
+    }
+    @keyframes petal-fall {
+      0%   { transform: translate(0, -8vh); }
+      100% { transform: translate(var(--drift, 12vw), 110vh); }
+    }
+    @keyframes petal-flutter {
+      0%   { transform: rotateZ(0deg) rotateY(0deg); }
+      50%  { transform: rotateZ(140deg) rotateY(180deg); }
+      100% { transform: rotateZ(360deg) rotateY(360deg); }
+    }
+
+    /* ---------- LIQUID GLASS ---------- */
+    .liquid-glass {
+      background: linear-gradient(135deg, rgba(255,255,255,0.55), rgba(255,240,247,0.30));
+      backdrop-filter: blur(22px) saturate(150%);
+      -webkit-backdrop-filter: blur(22px) saturate(150%);
+      border: 1px solid rgba(255,255,255,0.7);
+      box-shadow:
+        0 18px 46px rgba(122,70,98,0.18),
+        inset 0 1px 1px rgba(255,255,255,0.95),
+        inset 0 -4px 14px rgba(255,255,255,0.4);
+      position: relative; overflow: hidden;
+    }
+    .liquid-glass::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 45%);
+    }
+    .liquid-glass::after {
+      content: ''; position: absolute; top: -65%; left: -35%; width: 80%; height: 200%;
+      background: radial-gradient(closest-side, rgba(255,255,255,0.45), transparent);
+      transform: rotate(18deg); pointer-events: none;
+      animation: liquid-sheen 12s ease-in-out infinite;
+    }
+    @keyframes liquid-sheen {
+      0%,100% { transform: translateX(-14%) rotate(18deg); }
+      50%     { transform: translateX(48%) rotate(18deg); }
+    }
+
+    .nav-item { transition: all 0.2s cubic-bezier(0.4,0,0.2,1); border-radius: 12px; }
+    .nav-item.active { background: rgba(213,111,150,0.16); color: var(--sakura-deep); }
+    .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 22px 54px rgba(122,70,98,0.24); }
+    .mood-btn { transition: all 0.2s ease; }
+    .mood-btn.active { transform: scale(1.12); box-shadow: 0 8px 20px rgba(213,111,150,0.4); }
+    .chat-message { animation: fadeIn 0.3s ease forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-thumb { background: rgba(213,111,150,0.3); border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <!-- Living background layers -->
+  <div class="bg-stage"></div>
+  <div class="bg-veil"></div>
+  <svg class="branch left"  id="branch-left"  width="360" height="220" viewBox="0 0 360 220"></svg>
+  <svg class="branch right" id="branch-right" width="360" height="220" viewBox="0 0 360 220"></svg>
+  <div class="petal-field" id="petal-field"></div>
+
+  <!-- Top Navigation -->
+  <nav class="sticky top-0 z-50 border-b border-white/50 bg-white/45 backdrop-blur-xl">
+    <div class="max-w-screen-2xl mx-auto px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-x-2">
+        <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#e89bb6] to-[#d56f96] flex items-center justify-center shadow-inner">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3C12 3 8 7 8 11.5C8 15.5 10.5 18 12 18C13.5 18 16 15.5 16 11.5C16 7 12 3 12 3Z" fill="white" fill-opacity="0.92"/>
+            <circle cx="12" cy="12" r="3" fill="#d56f96"/>
+          </svg>
+        </div>
+        <div>
+          <div class="serif text-2xl font-semibold tracking-tight">Sakhi</div>
+          <div class="text-[10px] text-[#6b5566] -mt-1 tracking-[3px]">桜</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-x-8 text-sm">
+        <div class="hidden md:flex items-center gap-x-6 text-[#6b5566]">
+          <a href="#" class="hover:text-[#3a2b3f]">Features</a>
+          <a href="#" class="hover:text-[#3a2b3f]">How it works</a>
+          <a href="#" class="hover:text-[#3a2b3f]">Research</a>
+        </div>
+        <div class="flex items-center gap-x-3">
+          <button onclick="showModal('quick-log')" class="px-4 py-1.5 text-sm rounded-2xl border border-[#e89bb6]/40 hover:bg-white/70 transition-colors">Quick Log</button>
+          <button onclick="switchSection('ai-chat')" class="px-5 py-1.5 text-sm rounded-2xl bg-[#d56f96] text-white hover:bg-[#c45d85] transition-colors">Talk to Sakhi</button>
+        </div>
+        <div class="flex items-center gap-x-2">
+          <div class="w-8 h-8 rounded-full bg-white/70 flex items-center justify-center text-xs border border-white">M</div>
+          <div class="text-sm hidden sm:block">
+            <div class="font-medium">Maya</div>
+            <div class="text-[10px] text-[#6b5566]">Day 14</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="max-w-screen-2xl mx-auto px-8 pt-16 pb-10">
+    <div class="max-w-2xl">
+      <div class="uppercase tracking-[5px] text-xs text-[#d56f96] mb-4">A quiet companion</div>
+      <h1 class="serif text-7xl leading-[1.02] font-semibold tracking-[-2px] mb-5 drop-shadow-sm">
+        Bloom at<br>your own pace.
+      </h1>
+      <p class="text-lg text-[#5a4452] max-w-md mb-8">
+        Cycle, mood, habits, and gentle guidance — in a space that breathes with you.
+      </p>
+      <div class="flex gap-x-3">
+        <button onclick="switchSection('dashboard')" class="px-8 py-3 rounded-2xl bg-[#3a2b3f] text-white text-sm font-medium hover:bg-[#2a1f2e] transition-all active:scale-[0.985]">Enter your space</button>
+        <button onclick="switchSection('ai-chat')" class="px-8 py-3 rounded-2xl liquid-glass text-sm font-medium">Speak with Sakhi</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-screen-2xl mx-auto px-8 pb-16">
+    <div class="flex gap-7">
+      <!-- Sidebar -->
+      <aside class="w-60 shrink-0 hidden lg:block">
+        <div class="liquid-glass rounded-3xl p-2 sticky top-24">
+          <div class="px-3 py-2 text-xs uppercase tracking-widest text-[#6b5566]">Your space</div>
+          <div onclick="switchSection('dashboard')" class="nav-item active flex items-center gap-x-3 px-4 py-2.5 text-sm cursor-pointer mb-1" id="nav-dashboard"><span>🏠</span> Dashboard</div>
+          <div onclick="switchSection('cycle')" class="nav-item flex items-center gap-x-3 px-4 py-2.5 text-sm cursor-pointer mb-1" id="nav-cycle"><span>🌸</span> Cycle</div>
+          <div onclick="switchSection('mood-habits')" class="nav-item flex items-center gap-x-3 px-4 py-2.5 text-sm cursor-pointer mb-1" id="nav-mood-habits"><span>🌿</span> Mood &amp; Habits</div>
+          <div onclick="switchSection('journal')" class="nav-item flex items-center gap-x-3 px-4 py-2.5 text-sm cursor-pointer mb-1" id="nav-journal"><span>📖</span> Journal</div>
+          <div class="h-px bg-white/60 my-2 mx-3"></div>
+          <div onclick="switchSection('ai-chat')" class="nav-item flex items-center gap-x-3 px-4 py-2.5 text-sm cursor-pointer" id="nav-ai"><span>💬</span> AI Companions</div>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="flex-1 min-w-0">
+        <!-- DASHBOARD -->
