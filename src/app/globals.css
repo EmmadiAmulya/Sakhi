@@ -162,3 +162,95 @@ html.lenis {
 .lenis-smooth {
   min-height: 100vh;
 }
+
+/* ─── react-day-picker — Sakhi Glass Theme ─────────────────────────────── */
+
+/* Reset: give DayPicker enough width */
+.sakhi-calendar .rdp-root {
+  width: 100%;
+  --rdp-accent-color: #d56f96;
+  --rdp-accent-background-color: rgba(213, 111, 150, 0.12);
+}
+
+/* Day cells: uniform size, centered content */
+.sakhi-calendar .rdp-day {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  position: relative;
+}
+
+/* Modifier: logged period day */
+.sakhi-calendar .rdp-day--logged-period .rdp-day_button {
+  background-color: rgba(213, 111, 150, 0.30) !important;
+  color: #7d2e50 !important;
+  border: 1px solid rgba(213, 111, 150, 0.45);
+  font-weight: 700;
+  border-radius: 0.75rem;
+}
+
+/* Modifier: predicted period day */
+.sakhi-calendar .rdp-day--predicted-period .rdp-day_button {
+  background-color: rgba(213, 111, 150, 0.10) !important;
+  color: #d56f96 !important;
+  border: 1px dashed rgba(213, 111, 150, 0.45);
+  border-radius: 0.75rem;
+}
+
+/* Modifier: fertile window */
+.sakhi-calendar .rdp-day--fertile .rdp-day_button {
+  background-color: rgba(138, 90, 120, 0.12) !important;
+  color: #8a5a78 !important;
+  border: 1px solid rgba(138, 90, 120, 0.20);
+  border-radius: 0.75rem;
+}
+
+/* Modifier: ovulation day */
+.sakhi-calendar .rdp-day--ovulation .rdp-day_button {
+  background-color: rgba(138, 90, 120, 0.30) !important;
+  color: #fff !important;
+  border: 1px solid rgba(138, 90, 120, 0.55);
+  font-weight: 700;
+  border-radius: 0.75rem;
+}
+
+/* Modifier: days with logged symptoms/notes — render dot */
+.sakhi-calendar .rdp-day--has-dot::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #8a5a78;
+  pointer-events: none;
+}
+
+/* Selected day ring */
+.sakhi-calendar .rdp-day_button[aria-selected="true"] {
+  outline: 2px solid rgba(213, 111, 150, 0.55);
+  outline-offset: 1px;
+}
+
+/* Today pulse dot */
+.sakhi-calendar .rdp-today .rdp-day_button::before {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d56f96;
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  opacity: 0.75;
+}
+
+@keyframes ping {
+  75%, 100% { transform: translateX(-50%) scale(1.8); opacity: 0; }
+}

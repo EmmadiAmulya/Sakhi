@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Heart, Stethoscope, Settings } from "lucide-react";
+import { LayoutDashboard, CalendarHeart, Heart, Stethoscope, BookOpen, Settings } from "lucide-react";
 import Dock, { DockItemData } from "@/components/Dock";
 
 interface DockNavProps {
@@ -18,6 +18,12 @@ export default function DockNav({ activeTab, setActiveTab }: DockNavProps) {
       isActive: activeTab === "dashboard",
     },
     {
+      label: "Cycle Tracker",
+      icon: <CalendarHeart className="h-5 w-5 text-sakura-deep" />,
+      onClick: () => setActiveTab("cycle"),
+      isActive: activeTab === "cycle",
+    },
+    {
       label: "Sakhi Chat",
       icon: <Heart className="h-5 w-5 text-sakura-deep" />,
       onClick: () => setActiveTab("sakhi"),
@@ -28,6 +34,12 @@ export default function DockNav({ activeTab, setActiveTab }: DockNavProps) {
       icon: <Stethoscope className="h-5 w-5 text-plum" />,
       onClick: () => setActiveTab("maya"),
       isActive: activeTab === "maya",
+    },
+    {
+      label: "Journal",
+      icon: <BookOpen className="h-5 w-5 text-plum" />,
+      onClick: () => setActiveTab("journal"),
+      isActive: activeTab === "journal",
     },
     {
       label: "Settings",
@@ -44,10 +56,10 @@ export default function DockNav({ activeTab, setActiveTab }: DockNavProps) {
     >
       <Dock
         items={dockItems}
-        baseItemSize={40}
-        panelHeight={60}
-        magnification={58}
-        distance={140}
+        baseItemSize={38} // slightly smaller to comfortably fit 6 items on mobile viewports
+        panelHeight={58}
+        magnification={54}
+        distance={120}
         spring={{ mass: 0.1, stiffness: 350, damping: 20 }}
       />
     </div>

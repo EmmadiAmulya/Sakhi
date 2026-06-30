@@ -30,9 +30,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${quicksand.variable} ${notoSerifJP.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col relative text-ink-text bg-bg selection:bg-sakura/30">
+      <body suppressHydrationWarning className="min-h-full flex flex-col relative text-ink-text bg-bg selection:bg-sakura/30">
         <ClientProviders>
           {/* Atmospheric Fixed Layers */}
           <AppBackground />

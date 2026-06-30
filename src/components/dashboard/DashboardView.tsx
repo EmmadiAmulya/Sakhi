@@ -85,7 +85,11 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
           className="flex flex-col md:flex-row items-center gap-8 justify-between min-h-[220px]"
         >
           {/* Visual Cycle Progress Ring */}
-          <div className="relative flex items-center justify-center w-40 h-40 flex-shrink-0">
+          <div 
+            onClick={() => setActiveTab("cycle")}
+            className="relative flex items-center justify-center w-40 h-40 flex-shrink-0 cursor-pointer group/ring hover:scale-[1.02] transition-all duration-300"
+            title="Open Cycle Calendar"
+          >
             <div className="absolute inset-0 rounded-full bg-sakura/5 blur-md" />
             <svg className="w-full h-full transform -rotate-90">
               <circle
@@ -108,7 +112,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
             </svg>
             <div className="absolute flex flex-col items-center text-center">
               <span className="text-[10px] font-semibold text-ink-soft uppercase tracking-widest">Day</span>
-              <span className="text-3xl font-bold text-ink-text my-0.5">{cycleDay}</span>
+              <span className="text-3xl font-bold text-ink-text my-0.5 group-hover/ring:text-sakura-deep transition-colors">{cycleDay}</span>
               <span className="text-[9px] font-medium text-plum">of {profile.cycleLength}</span>
             </div>
           </div>
@@ -259,9 +263,18 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
 
         {/* Card 4: Daily Journal Notes (Span 1) */}
         <BentoCard span={1} className="space-y-4 flex flex-col">
-          <h3 className="text-sm font-bold text-ink-text font-serif border-b border-border/30 pb-2">
-            Daily Journal
-          </h3>
+          <div className="flex justify-between items-center border-b border-border/30 pb-2">
+            <h3 className="text-sm font-bold text-ink-text font-serif">
+              Daily Journal
+            </h3>
+            <button
+              type="button"
+              onClick={() => setActiveTab("journal")}
+              className="text-[9px] font-bold text-sakura-deep hover:text-plum cursor-pointer"
+            >
+              Open Diary &rarr;
+            </button>
+          </div>
           <form onSubmit={handleSaveNote} className="space-y-3 flex-1 flex flex-col justify-between">
             <textarea
               value={journalNote}

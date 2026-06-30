@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Settings, Lock, HardDrive, Bell, User } from "lucide-react";
+import { Settings, Lock, HardDrive, Bell, User, AlertCircle } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
 import { useProfileStore } from "@/lib/store/profile";
@@ -10,11 +10,35 @@ import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
 
 export default function SettingsView() {
-  const [reminders, setReminders] = useState(true);
   const [anonymity, setAnonymity] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<string>(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      return Notification.permission;
+    }
+    return "default";
+  });
 
-  const { profile, logout } = useProfileStore();
+  const { profile, logout, reminders, updateReminders } = useProfileStore();
+
+  const handleRequestPermission = async () => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      const result = await Notification.requestPermission();
+      setPermissionStatus(result);
+      if (result === "granted") {
+        updateReminders({ enabled: true });
+        try {
+          new Notification("Sakhi — Women's Health Companion", { 
+            body: "In-app notifications enabled! You will see alerts while Sakhi is active." 
+          });
+        } catch (e) {
+          console.warn("Failed to trigger local notification check", e);
+        }
+      } else {
+        updateReminders({ enabled: false });
+      }
+    }
+  };
 
   return (
     <motion.div
@@ -110,29 +134,111 @@ export default function SettingsView() {
 
         {/* Reminders & Notifications */}
         <GlassCard className="p-6 space-y-4">
-          <h2 className="text-base font-bold text-ink-text font-serif flex items-center gap-2 border-b border-border/30 pb-2">
-            <Bell className="h-4.5 w-4.5 text-sakura-deep" />
-            Reminders &amp; Logs
-          </h2>
-          
-          <div className="space-y-3 text-xs">
-            <div className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-glass/30 transition-all cursor-pointer" onClick={() => setReminders(!reminders)}>
-              <div className="flex flex-col">
-                <span className="font-semibold text-ink-text">Supplement Alarms</span>
-                <span className="text-[10px] text-ink-soft">Receive daily alarms matching dosage timing.</span>
+          <div className="flex justify-between items-center border-b border-border/30 pb-2">
+            <h2 className="text-base font-bold text-ink-text font-serif flex items-center gap-2">
+              <Bell className="h-4.5 w-4.5 text-sakura-deep" />
+              Reminders &amp; Alerts
+            </h2>
+            <button
+              onClick={() => updateReminders({ enabled: !reminders.enabled })}
+              className={`h-5 w-9 rounded-full transition-colors flex items-center p-0.5 cursor-pointer ${
+                reminders.enabled ? "bg-sakura-deep" : "bg-border/60"
+              }`}
+              aria-label="Toggle reminders globally"
+            >
+              <div className={`h-4 w-4 bg-white rounded-full transition-transform shadow-sm ${
+                reminders.enabled ? "translate-x-4" : "translate-x-0"
+              }`} />
+            </button>
+          </div>
+
+          <div className="space-y-3.5 text-xs">
+            
+            {/* Permission flow block */}
+            {permissionStatus !== "granted" && (
+              <div className="bg-sakura/5 border border-sakura-deep/15 p-3 rounded-xl space-y-2 flex flex-col justify-between">
+                <span className="text-[10px] text-ink-soft leading-normal block">
+                  Browser notification permissions are not granted. Allow access to test alert updates.
+                </span>
+                <GlassButton variant="secondary" onClick={handleRequestPermission} className="py-1 px-3 text-[10px] w-fit">
+                  Enable Browser Alerts
+                </GlassButton>
               </div>
-              <div className={`h-5 w-9 rounded-full transition-colors flex items-center p-0.5 ${reminders ? "bg-sakura-deep" : "bg-border/60"}`}>
-                <div className={`h-4 w-4 bg-white rounded-full transition-transform shadow-sm ${reminders ? "translate-x-4" : "translate-x-0"}`} />
+            )}
+
+            {/* Sub-toggles */}
+            <div className={`space-y-2 transition-opacity ${reminders.enabled ? "opacity-100" : "opacity-50 pointer-events-none"}`}>
+              
+              {/* Upcoming period */}
+              <div 
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-glass/30 transition-all cursor-pointer"
+                onClick={() => updateReminders({ upcomingPeriod: !reminders.upcomingPeriod })}
+              >
+                <div className="flex flex-col">
+                  <span className="font-semibold text-ink-text">Period Predictions</span>
+                  <span className="text-[10px] text-ink-soft">Receive warnings 2 days before predicted menstruation start.</span>
+                </div>
+                <div className={`h-4 w-4 rounded border flex items-center justify-center ${
+                  reminders.upcomingPeriod ? "bg-sakura-deep border-sakura-deep text-white" : "border-border"
+                }`}>
+                  {reminders.upcomingPeriod && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                </div>
               </div>
+
+              {/* Daily logs */}
+              <div 
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-glass/30 transition-all cursor-pointer"
+                onClick={() => updateReminders({ dailyLogNudge: !reminders.dailyLogNudge })}
+              >
+                <div className="flex flex-col">
+                  <span className="font-semibold text-ink-text">Daily Logging Nudge</span>
+                  <span className="text-[10px] text-ink-soft">Daily alert warning to log symptoms, moods, and energy.</span>
+                </div>
+                <div className={`h-4 w-4 rounded border flex items-center justify-center ${
+                  reminders.dailyLogNudge ? "bg-sakura-deep border-sakura-deep text-white" : "border-border"
+                }`}>
+                  {reminders.dailyLogNudge && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                </div>
+              </div>
+
+              {/* Supplements alerts */}
+              <div 
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-glass/30 transition-all cursor-pointer"
+                onClick={() => updateReminders({ supplementAlert: !reminders.supplementAlert })}
+              >
+                <div className="flex flex-col">
+                  <span className="font-semibold text-ink-text">Supplement Alarm</span>
+                  <span className="text-[10px] text-ink-soft">Receive alarms matching daily supplement dosage timers.</span>
+                </div>
+                <div className={`h-4 w-4 rounded border flex items-center justify-center ${
+                  reminders.supplementAlert ? "bg-sakura-deep border-sakura-deep text-white" : "border-border"
+                }`}>
+                  {reminders.supplementAlert && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                </div>
+              </div>
+
+              {/* Time setter */}
+              <div className="flex items-center justify-between p-2 rounded-lg bg-surface-glass/20 border border-border/20">
+                <span className="font-semibold text-ink-text">Alert Delivery Time</span>
+                <input 
+                  type="time" 
+                  value={reminders.time} 
+                  onChange={(e) => updateReminders({ time: e.target.value })}
+                  className="bg-white/40 border border-border rounded px-2 py-0.5 text-xs text-ink-text focus:outline-none"
+                />
+              </div>
+
             </div>
 
-            <div className="flex items-center justify-between p-2 rounded-lg bg-surface-glass/40">
-              <div className="flex flex-col">
-                <span className="font-semibold text-ink-text">Cycle Start Predictor</span>
-                <span className="text-[10px] text-ink-soft">Warn 2 days before menstrual cycle onset starts.</span>
-              </div>
-              <span className="text-[10px] font-bold text-sakura-deep bg-sakura/15 px-2 py-0.5 rounded-full">ENABLED</span>
+            {/* Clear Honest Microcopy Disclaimer */}
+            <div className="bg-plum/5 border border-plum/15 rounded-xl p-3 flex items-start gap-2 text-[10px] text-ink-soft leading-normal">
+              <AlertCircle className="h-4.5 w-4.5 text-plum flex-shrink-0 mt-0.5" />
+              <p>
+                <span className="font-bold text-plum">System Limit:</span> Reminders fire while Sakhi is active in your browser tab. Background push alerts are deferred to future database updates.
+                {/* TODO: Implement service worker Push Subscription triggers here when migrating to Supabase */}
+              </p>
             </div>
+
           </div>
         </GlassCard>
 

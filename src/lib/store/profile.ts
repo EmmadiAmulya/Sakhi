@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { CycleLog } from "@/lib/cycle";
+import { mockCycleLogs, mockJournalEntries } from "@/lib/mock-data";
+import type { JSONContent } from "@tiptap/react";
+
+export { getCurrentCycleDay, getCyclePhaseForDay as getCyclePhase } from "@/lib/cycle";
 
 export interface ProfileData {
   name: string;
@@ -10,16 +15,50 @@ export interface ProfileData {
   lastPeriodDate: string | null; // "YYYY-MM-DD"
 }
 
+export interface JournalEntry {
+  id: string;
+  createdAt: string; // ISO string
+  contentJSON: JSONContent; // Tiptap JSON content
+  contentText: string; // plain text for preview
+  mood?: string;
+  cyclePhase: string;
+}
+
+export interface ReminderPreferences {
+  enabled: boolean;
+  upcomingPeriod: boolean;
+  dailyLogNudge: boolean;
+  supplementAlert: boolean;
+  time: string; // e.g. "09:00"
+}
+
 interface ProfileState {
   profile: ProfileData;
   isLoggedIn: boolean;
   isOnboarded: boolean;
   email: string | null;
+  cycleLogs: Record<string, CycleLog>; // Keyed by YYYY-MM-DD
+  journalEntries: JournalEntry[];
+  reminders: ReminderPreferences;
+  
+  // Actions
   setProfile: (profile: Partial<ProfileData>) => void;
   login: (email: string) => void;
   logout: () => void;
   setOnboarded: (onboarded: boolean) => void;
   resetAll: () => void;
+  
+  // Cycle logs actions
+  setCycleLog: (date: string, log: Partial<CycleLog>) => void;
+  deleteCycleLog: (date: string) => void;
+  
+  // Journal actions
+  addJournalEntry: (entry: { contentJSON: JSONContent; contentText: string; mood?: string; cyclePhase: string }) => void;
+  updateJournalEntry: (id: string, contentJSON: JSONContent, contentText: string, mood?: string) => void;
+  deleteJournalEntry: (id: string) => void;
+  
+  // Reminders actions
+  updateReminders: (prefs: Partial<ReminderPreferences>) => void;
 }
 
 const initialProfile: ProfileData = {
@@ -31,6 +70,14 @@ const initialProfile: ProfileData = {
   lastPeriodDate: null,
 };
 
+const initialReminders: ReminderPreferences = {
+  enabled: false,
+  upcomingPeriod: true,
+  dailyLogNudge: true,
+  supplementAlert: false,
+  time: "09:00",
+};
+
 export const useProfileStore = create<ProfileState>()(
   persist(
     (set) => ({
@@ -38,100 +85,101 @@ export const useProfileStore = create<ProfileState>()(
       isLoggedIn: false,
       isOnboarded: false,
       email: null,
+      cycleLogs: mockCycleLogs,
+      journalEntries: mockJournalEntries,
+      reminders: initialReminders,
+      
       setProfile: (updated) =>
         set((state) => ({
           profile: { ...state.profile, ...updated },
         })),
+        
       login: (email) =>
         set({
           isLoggedIn: true,
           email,
         }),
+        
       logout: () =>
         set({
           profile: initialProfile,
           isLoggedIn: false,
           isOnboarded: false,
           email: null,
+          cycleLogs: {},
+          journalEntries: [],
+          reminders: initialReminders,
         }),
+        
       setOnboarded: (onboarded) => set({ isOnboarded: onboarded }),
+      
       resetAll: () =>
         set({
           profile: initialProfile,
           isLoggedIn: false,
           isOnboarded: false,
           email: null,
+          cycleLogs: {},
+          journalEntries: [],
+          reminders: initialReminders,
         }),
+        
+      // Cycle logs actions
+      setCycleLog: (date, log) =>
+        set((state) => {
+          const existing = state.cycleLogs[date] || {
+            date,
+            isPeriod: false,
+            symptoms: [],
+          };
+          return {
+            cycleLogs: {
+              ...state.cycleLogs,
+              [date]: { ...existing, ...log },
+            },
+          };
+        }),
+        
+      deleteCycleLog: (date) =>
+        set((state) => {
+          const updatedLogs = { ...state.cycleLogs };
+          delete updatedLogs[date];
+          return { cycleLogs: updatedLogs };
+        }),
+        
+      // Journal actions
+      addJournalEntry: (entry) =>
+        set((state) => {
+          const newEntry: JournalEntry = {
+            id: `entry-${Date.now()}`,
+            createdAt: new Date().toISOString(),
+            ...entry,
+          };
+          return {
+            journalEntries: [newEntry, ...state.journalEntries],
+          };
+        }),
+        
+      updateJournalEntry: (id, contentJSON, contentText, mood) =>
+        set((state) => ({
+          journalEntries: state.journalEntries.map((e) =>
+            e.id === id ? { ...e, contentJSON, contentText, ...(mood ? { mood } : {}) } : e
+          ),
+        })),
+        
+      deleteJournalEntry: (id) =>
+        set((state) => ({
+          journalEntries: state.journalEntries.filter((e) => e.id !== id),
+        })),
+        
+      // Reminders actions
+      updateReminders: (prefs) =>
+        set((state) => ({
+          reminders: { ...state.reminders, ...prefs },
+        })),
     }),
     {
       name: "sakhi-profile-store",
     }
   )
 );
-
-// Helper function to calculate current cycle day from the last period date
-export const getCurrentCycleDay = (lastPeriodDate: string | null, cycleLength: number): number => {
-  if (!lastPeriodDate) return 12; // fallback default
-  const lastDate = new Date(lastPeriodDate);
-  const today = new Date();
-  
-  // Normalize dates to midnight
-  lastDate.setHours(0, 0, 0, 0);
-  today.setHours(0, 0, 0, 0);
-  
-  const diffTime = today.getTime() - lastDate.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
-  if (diffDays < 0) return 1; // last period date is in the future
-  
-  return (diffDays % cycleLength) + 1;
-};
-
-// Helper function to get current cycle phase from the cycle day and length
-export interface CalculatedPhase {
-  name: string;
-  description: string;
-  startDay: number;
-  endDay: number;
-  color: string;
-}
-
-export const getCyclePhase = (day: number, cycleLength: number): CalculatedPhase => {
-  const mEnd = Math.max(3, Math.min(7, Math.floor(cycleLength * 0.18)));
-  const fEnd = Math.floor(cycleLength * 0.46);
-  const oEnd = Math.floor(cycleLength * 0.57);
-
-  if (day <= mEnd) {
-    return {
-      name: "Menstrual Phase",
-      description: "Your body sheds the uterine lining. Focus on rest, warm teas, and gentle stretching.",
-      startDay: 1,
-      endDay: mEnd,
-      color: "#d56f96",
-    };
-  } else if (day <= fEnd) {
-    return {
-      name: "Follicular Phase",
-      description: "Estrogen rises, boosting energy and focus. A wonderful time to plan, learn, and socialize.",
-      startDay: mEnd + 1,
-      endDay: fEnd,
-      color: "#e89bb6",
-    };
-  } else if (day <= oEnd) {
-    return {
-      name: "Ovulatory Phase",
-      description: "Estrogen and LH peak. You are at high energy, expressive, and physically active.",
-      startDay: fEnd + 1,
-      endDay: oEnd,
-      color: "#8a5a78", // plum color
-    };
-  } else {
-    return {
-      name: "Luteal Phase",
-      description: "Progesterone rises, winding down energy. Prioritize warm, grounding meals and mindful reflection.",
-      startDay: oEnd + 1,
-      endDay: cycleLength,
-      color: "#4e364a", // deep plum
-    };
-  }
-};
