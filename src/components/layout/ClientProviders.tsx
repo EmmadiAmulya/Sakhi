@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Lenis from "lenis";
+import Toaster from "@/components/ui/Toaster";
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
   // QueryClient initialization
@@ -49,6 +50,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      <Toaster />
     </QueryClientProvider>
   );
 }

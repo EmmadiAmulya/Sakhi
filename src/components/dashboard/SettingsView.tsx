@@ -5,7 +5,9 @@ import { Settings, Lock, HardDrive, Bell, User, AlertCircle } from "lucide-react
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
 import { useProfileStore } from "@/lib/store/profile";
+import { useRemindersSync, useUpdateReminders } from "@/lib/data/reminders";
 import OnboardingForm from "@/components/auth/OnboardingForm";
+import { createClient } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
 
@@ -19,7 +21,26 @@ export default function SettingsView() {
     return "default";
   });
 
-  const { profile, logout, reminders, updateReminders } = useProfileStore();
+  const profile = useProfileStore((s) => s.profile);
+  const logout = useProfileStore((s) => s.logout);
+  const reminders = useProfileStore((s) => s.reminders);
+
+  // Hydrate reminder prefs from Supabase, and persist changes via the hook
+  // (optimistic store update + rollback + toast).
+  useRemindersSync();
+  const updateRemindersMutation = useUpdateReminders();
+  const updateReminders = (prefs: Parameters<typeof updateRemindersMutation.mutate>[0]) =>
+    updateRemindersMutation.mutate(prefs);
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Sign out error:", e);
+    }
+    logout();
+  };
 
   const handleRequestPermission = async () => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -262,7 +283,7 @@ export default function SettingsView() {
             </GlassButton>
             <GlassButton 
               variant="ghost" 
-              onClick={logout}
+              onClick={handleLogout}
               className="text-red-600 hover:bg-red-50 hover:border-red-100 font-bold"
             >
               Reset Profile &amp; Logout

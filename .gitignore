@@ -61,3 +61,6 @@ desktop.ini
 
 # agent frameworks
 .agents/
+.ponytail-agents.tmp
+*.ponytail.tmp
+Userssaketponytail-agents.tmp.md

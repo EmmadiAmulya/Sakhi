@@ -4,17 +4,16 @@ import React, { useState } from "react";
 import { Mail, Sparkles, Heart } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
-import { useProfileStore } from "@/lib/store/profile";
-import { motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function LoginView() {
-  const login = useProfileStore((state) => state.login);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -25,16 +24,27 @@ export default function LoginView() {
 
     setLoading(true);
 
-    // Simulate sending magic link
-    setTimeout(() => {
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (authError) {
+        setError(authError.message || "Failed to send magic link.");
+        setLoading(false);
+      } else {
+        setLoading(false);
+        setMagicLinkSent(true);
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setError(errMsg);
       setLoading(false);
-      setMagicLinkSent(true);
-      
-      // Simulate user clicking magic link after 1.5s
-      setTimeout(() => {
-        login(email);
-      }, 1500);
-    }, 1200);
+    }
   };
 
   return (
@@ -105,8 +115,8 @@ export default function LoginView() {
 
                 <div className="text-center pt-2">
                   <p className="text-[10px] text-ink-soft/80 leading-normal px-2">
-                    Sakhi is designed with local state privacy. 
-                    Your account data and chat logs never leave your workspace browser.
+                    Sakhi is designed with cloud data persistence &amp; strict privacy.
+                    Your entries are securely synced and never shared.
                   </p>
                 </div>
               </motion.form>
@@ -124,11 +134,11 @@ export default function LoginView() {
                 <div className="space-y-1">
                   <h3 className="text-sm font-bold text-ink-text">Magic Link Sent!</h3>
                   <p className="text-xs text-ink-soft leading-relaxed px-4">
-                    We&apos;ve sent a login link to <span className="font-semibold text-plum">{email}</span>. Click it to verify your access.
+                    We&apos;ve sent a login link to <span className="font-semibold text-plum">{email}</span>. Please check your inbox and click the link to sign in.
                   </p>
                 </div>
-                <div className="pt-2 text-[10px] text-sakura-deep font-semibold animate-pulse">
-                  Simulating authentication verification...
+                <div className="pt-2 text-[10px] text-ink-soft font-semibold">
+                  You can close this tab or keep it open.
                 </div>
               </motion.div>
             )}
@@ -139,5 +149,3 @@ export default function LoginView() {
     </div>
   );
 }
-
-import { AnimatePresence } from "framer-motion";

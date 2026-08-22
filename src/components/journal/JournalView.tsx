@@ -4,6 +4,12 @@ import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { BookOpen, Sparkles, Trash2, CalendarHeart, Plus, ArrowLeft } from "lucide-react";
 import { useProfileStore } from "@/lib/store/profile";
+import {
+  useJournalEntriesSync,
+  useAddJournalEntry,
+  useUpdateJournalEntry,
+  useDeleteJournalEntry,
+} from "@/lib/data/journal";
 import type { JSONContent } from "@tiptap/react";
 import { calculateCycle, refineCycleMetrics } from "@/lib/cycle";
 import GlassCard from "@/components/ui/GlassCard";
@@ -45,7 +51,13 @@ const MOODS = [
 export default function JournalView() {
   const profile = useProfileStore((state) => state.profile);
   const cycleLogs = useProfileStore((state) => state.cycleLogs);
-  const { journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry } = useProfileStore();
+  const journalEntries = useProfileStore((state) => state.journalEntries);
+
+  // Hydrate entries from Supabase into the store (source for reads below).
+  useJournalEntriesSync();
+  const addEntry = useAddJournalEntry();
+  const updateEntry = useUpdateJournalEntry();
+  const deleteEntry = useDeleteJournalEntry();
 
   const [activeEntryId, setActiveEntryId] = useState<string | "new" | null>(null);
   const [selectedMood, setSelectedMood] = useState<string | undefined>(undefined);
@@ -72,21 +84,20 @@ export default function JournalView() {
   };
 
   const handleSaveNew = (contentJSON: JSONContent, contentText: string) => {
-    // Commit new entry to Zustand store
-    addJournalEntry({
+    // Persist via the data hook (optimistic store update + rollback + toast).
+    addEntry.mutate({
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
       contentJSON,
       contentText,
       mood: selectedMood,
       cyclePhase: currentPhaseName,
     });
-    
-    // Find the newly created entry's ID to transition to edit mode seamlessly
-    // Our Zustand actions append new entries to the front, so the most recent is journalEntries[0] (or will be updated on state re-render)
     setActiveEntryId(null);
   };
 
   const handleUpdate = (id: string, contentJSON: JSONContent, contentText: string) => {
-    updateJournalEntry(id, contentJSON, contentText, selectedMood);
+    updateEntry.mutate({ id, contentJSON, contentText, mood: selectedMood });
   };
 
   const activeEntry = journalEntries.find((e) => e.id === activeEntryId);
@@ -150,7 +161,12 @@ export default function JournalView() {
                       onClick={() => {
                         setSelectedMood(m.id);
                         if (activeEntry) {
-                          updateJournalEntry(activeEntry.id, activeEntry.contentJSON, activeEntry.contentText, m.id);
+                          updateEntry.mutate({
+                            id: activeEntry.id,
+                            contentJSON: activeEntry.contentJSON,
+                            contentText: activeEntry.contentText,
+                            mood: m.id,
+                          });
                         }
                       }}
                       className={`py-1.5 px-3 rounded-full border text-[10px] font-semibold transition-all duration-200 cursor-pointer select-none ${
@@ -298,7 +314,7 @@ export default function JournalView() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                deleteJournalEntry(entry.id);
+                                deleteEntry.mutate(entry.id);
                               }}
                               className="p-1 rounded text-red-500 hover:bg-red-500/10 cursor-pointer"
                               aria-label="Delete entry"

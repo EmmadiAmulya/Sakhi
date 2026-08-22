@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { X, Droplet, Sparkles, Smile, Flame, BookOpen, Trash2 } from "lucide-react";
 import { useProfileStore } from "@/lib/store/profile";
+import { useUpsertCycleLog, useDeleteCycleLog } from "@/lib/data/cycle-logs";
 import { CycleLog } from "@/lib/cycle";
 import GlassButton from "@/components/ui/GlassButton";
 import { format } from "date-fns";
@@ -40,7 +41,9 @@ const MOODS = [
 
 export default function DayDetailSheet({ date, onClose }: DayDetailSheetProps) {
   const dateStr = format(date, "yyyy-MM-dd");
-  const { cycleLogs, setCycleLog, deleteCycleLog } = useProfileStore();
+  const cycleLogs = useProfileStore((s) => s.cycleLogs);
+  const upsertLog = useUpsertCycleLog();
+  const deleteLog = useDeleteCycleLog();
 
   const existingLog = cycleLogs[dateStr];
 
@@ -66,12 +69,12 @@ export default function DayDetailSheet({ date, onClose }: DayDetailSheetProps) {
       ...(isPeriod ? { flow: flow || "medium" } : { flow: undefined }),
     };
 
-    setCycleLog(dateStr, logData);
+    upsertLog.mutate({ date: dateStr, log: logData });
     onClose();
   };
 
   const handleDelete = () => {
-    deleteCycleLog(dateStr);
+    deleteLog.mutate(dateStr);
     onClose();
   };
 

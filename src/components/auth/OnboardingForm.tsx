@@ -1,13 +1,14 @@
 "use client";
 
 import React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Sparkles, Calendar, Scale, Ruler, User } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
 import { useProfileStore } from "@/lib/store/profile";
+import { useUpsertProfile } from "@/lib/data/profile";
 import { motion } from "framer-motion";
 
 const onboardingSchema = z.object({
@@ -27,12 +28,13 @@ interface OnboardingFormProps {
 }
 
 export default function OnboardingForm({ onSuccess, isEditing = false }: OnboardingFormProps) {
-  const { profile, setProfile, setOnboarded } = useProfileStore();
+  const profile = useProfileStore((s) => s.profile);
+  const upsertProfile = useUpsertProfile();
 
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors, isSubmitting }
   } = useForm<OnboardingValues>({
     resolver: zodResolver(onboardingSchema),
@@ -46,24 +48,27 @@ export default function OnboardingForm({ onSuccess, isEditing = false }: Onboard
     }
   });
 
-  const ageValue = watch("age");
+  // useWatch (vs form.watch) is React-Compiler-safe and avoids the
+  // "incompatible library" memoization warning.
+  const ageValue = useWatch({ control, name: "age" });
 
   const onSubmit = async (data: OnboardingValues) => {
-    // Save to Zustand store
-    setProfile({
-      name: data.name,
-      age: data.age,
-      height: data.height,
-      weight: data.weight,
-      cycleLength: data.cycleLength,
-      lastPeriodDate: data.lastPeriodDate || null,
-    });
-    
-    if (!isEditing) {
-      setOnboarded(true);
+    try {
+      // Persist via the data hook: optimistic store update (profile + onboarded),
+      // rollback + toast on error. Throws on failure so we keep the form open.
+      await upsertProfile.mutateAsync({
+        name: data.name,
+        age: data.age,
+        height: data.height,
+        weight: data.weight,
+        cycleLength: data.cycleLength,
+        lastPeriodDate: data.lastPeriodDate || null,
+        markOnboarded: !isEditing,
+      });
+      onSuccess?.();
+    } catch {
+      // Error toast already surfaced by the mutation; leave the form for retry.
     }
-    
-    onSuccess?.();
   };
 
   return (

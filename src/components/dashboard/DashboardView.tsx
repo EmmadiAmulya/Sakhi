@@ -4,12 +4,11 @@ import React, { useState } from "react";
 import { Droplet, Sparkles, Bed, Plus, Check, Heart, Stethoscope } from "lucide-react";
 import GlassButton from "@/components/ui/GlassButton";
 import { BentoGrid, BentoCard, NavCard } from "@/components/dashboard/BentoGrid";
-import { 
-  mockDailyHabits, 
-  mockSupplements as initialSupplements, 
-  Supplement 
-} from "@/lib/mock-data";
+import { mockDailyHabits } from "@/lib/mock-data";
 import { useProfileStore, getCurrentCycleDay, getCyclePhase } from "@/lib/store/profile";
+import { useSupplementsToday, useToggleSupplement } from "@/lib/data/supplements";
+import { useTodayMoodLog, useUpsertMoodLog } from "@/lib/data/mood-logs";
+import { useDevSeed } from "@/lib/data/dev-seed";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
 
@@ -20,10 +19,19 @@ interface DashboardViewProps {
 export default function DashboardView({ setActiveTab }: DashboardViewProps) {
   const profile = useProfileStore((state) => state.profile);
 
-  // Local state for interactiveness
-  const [supplements, setSupplements] = useState<Supplement[]>(initialSupplements);
+  // Dev-only mock seed (no-op unless NEXT_PUBLIC_ENABLE_DEV_SEED=true)
+  useDevSeed();
+
+  // Supplements + mood persist to Supabase. Water/sleep remain local because they
+  // are quantitative and don't map onto the boolean habit_logs schema (see SETUP.md).
+  const { data: supplements = [] } = useSupplementsToday();
+  const toggleSupp = useToggleSupplement();
+  const { data: todayMood } = useTodayMoodLog();
+  const upsertMood = useUpsertMoodLog();
+
   const [waterIntake, setWaterIntake] = useState(mockDailyHabits.waterIntake);
-  const [selectedMood, setSelectedMood] = useState(mockDailyHabits.mood);
+  const [selectedMood, setSelectedMood] = useState<string | undefined>(undefined);
+  const activeMood = selectedMood ?? todayMood?.mood ?? undefined;
   const [journalNote, setJournalNote] = useState("");
   const [noteSaved, setNoteSaved] = useState(false);
 
@@ -35,9 +43,9 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
     : 16;
 
   const toggleSupplement = (id: string) => {
-    setSupplements(prev =>
-      prev.map(sup => (sup.id === id ? { ...sup, taken: !sup.taken } : sup))
-    );
+    const current = supplements.find((s) => s.id === id);
+    if (!current) return;
+    toggleSupp.mutate({ id, taken: !current.taken });
   };
 
   const addWater = () => {
@@ -204,9 +212,12 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
               {(["serene", "energetic", "sensitive", "fatigued", "reflective"] as const).map((m) => (
                 <button
                   key={m}
-                  onClick={() => setSelectedMood(m)}
+                  onClick={() => {
+                    setSelectedMood(m);
+                    upsertMood.mutate({ mood: m });
+                  }}
                   className={`flex-1 py-1 rounded-md text-[9px] font-semibold transition-all capitalize cursor-pointer border ${
-                    selectedMood === m
+                    activeMood === m
                       ? "bg-sakura-deep/15 text-sakura-deep border-sakura-deep/30 shadow-inner"
                       : "bg-surface-glass/40 border-transparent text-ink-soft hover:bg-surface-glass/85"
                   }`}

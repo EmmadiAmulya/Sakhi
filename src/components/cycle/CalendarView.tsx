@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { DayPicker } from "react-day-picker";
 import { CalendarHeart, ShieldAlert } from "lucide-react";
 import { useProfileStore } from "@/lib/store/profile";
+import { useCycleLogsSync } from "@/lib/data/cycle-logs";
 import {
   calculateCycle,
   refineCycleMetrics,
@@ -22,6 +23,9 @@ import "react-day-picker/style.css";
 export default function CalendarView() {
   const profile = useProfileStore((state) => state.profile);
   const cycleLogs = useProfileStore((state) => state.cycleLogs);
+
+  // Hydrate cycle logs from Supabase into the store (source for reads below).
+  useCycleLogsSync();
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isLogSheetOpen, setIsLogSheetOpen] = useState(false);
