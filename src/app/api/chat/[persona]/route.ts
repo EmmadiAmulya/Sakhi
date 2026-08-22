@@ -12,6 +12,37 @@ const MAX_CHARS_PER_MESSAGE = 8000;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
+const EMBED_URL = "https://integrate.api.nvidia.com/v1/embeddings";
+const EMBED_MODEL = "nvidia/nemotron-3-embed-1b";
+
+/** RAG for Maya: top-k KB chunks for the query. Returns null on any failure — chat degrades gracefully. */
+async function retrieveContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  apiKey: string,
+  query: string
+): Promise<string | null> {
+  try {
+    const res = await fetch(EMBED_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+      body: JSON.stringify({ input: [query], model: EMBED_MODEL, input_type: "query" }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const vector: number[] | undefined = json?.data?.[0]?.embedding;
+    if (!Array.isArray(vector)) return null;
+
+    const { data, error } = await supabase.rpc("match_document_chunks", {
+      query_embedding: JSON.stringify(vector),
+      match_count: 5,
+    });
+    if (error || !data?.length) return null;
+    return data.map((d: { content: string }) => d.content).join("\n\n---\n\n");
+  } catch {
+    return null;
+  }
+}
+
 function validateMessages(input: unknown): ChatMessage[] | null {
   if (!Array.isArray(input) || input.length === 0 || input.length > MAX_MESSAGES) return null;
   const out: ChatMessage[] = [];
@@ -109,6 +140,16 @@ export async function POST(
     return NextResponse.json({ error: "Could not save your message." }, { status: 500 });
   }
 
+  let systemPrompt = config.systemPrompt;
+  if (persona === "maya") {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    const context = await retrieveContext(supabase, apiKey, lastUser?.content ?? "");
+    // Only ground the reply when retrieval actually found something relevant.
+    if (context) {
+      systemPrompt += `\n\nREFERENCE CONTEXT from the app's peer-reviewed knowledge base. Ground your answer in it and cite it where relevant; if it doesn't cover the question, say so:\n\n${context}`;
+    }
+  }
+
   let nimRes: Response;
   try {
     nimRes = await fetch(NIM_URL, {
@@ -121,7 +162,7 @@ export async function POST(
       body: JSON.stringify({
         model: MODEL,
         messages: [
-          { role: "system", content: config.systemPrompt },
+          { role: "system", content: systemPrompt },
           ...messages.slice(-MAX_MESSAGES),
         ],
         temperature: 0.6,
