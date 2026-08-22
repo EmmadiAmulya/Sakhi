@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sakhi — Women's Health Companion
 
-## Getting Started
+A privacy-first, sakura-themed PWA for cycle tracking, journaling, mood/habit logging, and two AI companions:
 
-First, run the development server:
+- **Sakhi** — empathetic emotional support
+- **Maya** — evidence-based health guide, grounded (RAG) in a peer-reviewed women's-health knowledge base
+
+## Stack
+
+Next.js 16 (App Router) · React 19 · Tailwind v4 · Supabase (auth + Postgres + RLS + pgvector) · NVIDIA NIM (`llama-3.3-nemotron-super-49b-v1.5`) · TanStack Query · Framer Motion
+
+## Architecture
+
+- **User data** flows browser → Supabase directly, protected by Row-Level Security (`src/lib/data/*`)
+- **AI** flows browser → `/api/chat/[persona]` server route → NVIDIA NIM; the API key never reaches the client. Maya answers are grounded via pgvector retrieval over `document_chunks`
+- **Migrations**: `supabase/migrations/*.sql`, applied via the Supabase SQL editor
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create `.env.local` (see `.env.example` values in docs):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=   # server only — health check, RAG ingestion
+NVIDIA_NIM_API_KEY=nvapi-... # server only
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Apply migrations `0001`–`0003` in the Supabase SQL editor, then build the knowledge base once:
 
-## Learn More
+```bash
+node scripts/ingest.mjs
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Develop
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm dev      # http://localhost:3000
+pnpm lint
+npx tsc --noEmit
+```

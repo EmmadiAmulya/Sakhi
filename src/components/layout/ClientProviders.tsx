@@ -20,6 +20,13 @@ export default function ClientProviders({ children }: { children: React.ReactNod
   );
 
   useEffect(() => {
+    // Register the PWA service worker (installability; see public/sw.js).
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Non-fatal: app works without installability.
+      });
+    }
+
     // Guard against prefers-reduced-motion
     const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (reducedMotionQuery.matches) {
