@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Send, User, AlertCircle, Heart } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
 import { useProfileStore } from "@/lib/store/profile";
 import { PERSONAS } from "@/lib/personas";
+import { useChatHistory } from "@/lib/data/chat";
 import { motion, AnimatePresence } from "framer-motion";
 import { pageVariants, itemVariants } from "@/lib/motion";
 
@@ -26,21 +27,36 @@ export default function SakhiView({ setActiveTab }: SakhiViewProps) {
   const displayName = profile.name || "Amulya";
   const persona = PERSONAS.sakhi;
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "init-1",
-      sender: "bot",
-      text: persona.introMessage.replace("{name}", displayName),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputVal, setInputVal] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Saved conversation (or intro bubble) plus this session's new messages.
+  const { data: history } = useChatHistory("sakhi");
+  const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const view = useMemo<Message[]>(() => {
+    const base: Message[] =
+      history && history.length > 0
+        ? history.map((m) => ({
+            id: `hist-${m.createdAt}`,
+            sender: m.role === "user" ? "user" : "bot",
+            text: m.content,
+            timestamp: fmtTime(m.createdAt),
+          }))
+        : [{
+            id: "init-1",
+            sender: "bot",
+            text: persona.introMessage.replace("{name}", displayName),
+            timestamp: "",
+          }];
+    return [...base, ...messages];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history, messages, displayName]);
+
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping]);
+  }, [view, isTyping]);
 
   const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -74,7 +90,7 @@ export default function SakhiView({ setActiveTab }: SakhiViewProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: messages
+          messages: view
             .filter(m => m.sender === "user" || (!m.isSuggestion && m.timestamp))
             .map(m => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
         }),
@@ -125,7 +141,7 @@ export default function SakhiView({ setActiveTab }: SakhiViewProps) {
       <GlassCard className="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col min-h-0 relative rounded-3xl">
         <div className="flex-1 overflow-y-auto space-y-4 pr-1">
           <AnimatePresence initial={false}>
-            {messages.map((msg) => {
+            {view.map((msg) => {
               const isUser = msg.sender === "user";
               
               if (msg.isSuggestion) {

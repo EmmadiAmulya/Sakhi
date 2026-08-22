@@ -1,122 +1,89 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { todayStr } from "./mood-logs";
 import { db, requireUserId } from "./client";
 import { queryKeys } from "./keys";
 import { toast } from "@/lib/toast";
-import { todayStr } from "./mood-logs";
-import type { HabitRow, HabitLogRow } from "./database.types";
-
-export interface HabitWithStatus {
-  id: string;
-  name: string;
-  icon: string | null;
-  done: boolean;
-}
 
 /**
- * Full habits data layer. NOTE: the current dashboard's water/sleep trackers are
- * quantitative (ml / hours) and do not map onto the boolean habit_logs schema, so
- * they remain local (see SETUP.md). These hooks power any future boolean habit UI.
+ * Quantitative daily habits (water ml, sleep hours) stored as habit rows with
+ * a numeric value on habit_logs. Habit rows are created on first use by name.
  */
-export async function fetchHabitsToday(): Promise<HabitWithStatus[]> {
-  const date = todayStr();
-  const [{ data: habits, error: hErr }, { data: logs, error: lErr }] = await Promise.all([
-    db().from("habits").select("*").order("created_at", { ascending: true }),
-    db().from("habit_logs").select("*").eq("log_date", date),
-  ]);
-  if (hErr) throw new Error(hErr.message);
-  if (lErr) throw new Error(lErr.message);
 
-  const doneBy = new Map<string, boolean>();
-  (logs as HabitLogRow[] | null)?.forEach((l) => doneBy.set(l.habit_id, Boolean(l.done)));
+async function getHabitId(name: string): Promise<string> {
+  const userId = await requireUserId();
+  const { data: existing, error: selErr } = await db()
+    .from("habits")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("name", name)
+    .maybeSingle();
+  if (selErr) throw new Error(selErr.message);
+  if (existing) return (existing as { id: string }).id;
 
-  return (habits as HabitRow[] | null ?? []).map((h) => ({
-    id: h.id,
-    name: h.name,
-    icon: h.icon,
-    done: doneBy.get(h.id) ?? false,
-  }));
+  const { data: created, error: insErr } = await db()
+    .from("habits")
+    .insert({ user_id: userId, name })
+    .select("id")
+    .single();
+  if (insErr) {
+    // Race: another tab created it first — re-read instead of failing.
+    const { data: retry, error: retryErr } = await db()
+      .from("habits")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("name", name)
+      .maybeSingle();
+    if (retryErr || !retry) throw new Error(insErr.message);
+    return (retry as { id: string }).id;
+  }
+  return (created as { id: string }).id;
 }
 
-export function useHabitsToday() {
+export function useHabitValue(name: string) {
+  const date = todayStr();
   return useQuery({
-    queryKey: [...queryKeys.habits, todayStr()],
-    queryFn: fetchHabitsToday,
+    queryKey: [...queryKeys.habitLogs(date), name],
+    queryFn: async (): Promise<number | null> => {
+      const userId = await requireUserId();
+      const { data, error } = await db()
+        .from("habit_logs")
+        .select("value, habit_id, habits!inner(name)")
+        .eq("user_id", userId)
+        .eq("log_date", date)
+        .eq("habits.name", name)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      return (data as unknown as { value: number | null }).value;
+    },
     staleTime: 60_000,
   });
 }
 
-export function useToggleHabit() {
+export function useSetHabitValue(name: string) {
   const qc = useQueryClient();
   const date = todayStr();
-  const key = [...queryKeys.habits, date];
+  const key = [...queryKeys.habitLogs(date), name];
 
   return useMutation({
-    mutationFn: async (vars: { id: string; done: boolean }) => {
-      const userId = await requireUserId();
+    mutationFn: async (value: number) => {
+      const habitId = await getHabitId(name);
       const { error } = await db()
         .from("habit_logs")
         .upsert(
-          { user_id: userId, habit_id: vars.id, log_date: date, done: vars.done },
+          { user_id: (await requireUserId()), habit_id: habitId, log_date: date, value, done: value > 0 },
           { onConflict: "habit_id,log_date" }
         );
       if (error) throw new Error(error.message);
     },
-    onMutate: async (vars) => {
-      await qc.cancelQueries({ queryKey: key });
-      const prev = qc.getQueryData<HabitWithStatus[]>(key);
-      if (prev) {
-        qc.setQueryData<HabitWithStatus[]>(
-          key,
-          prev.map((h) => (h.id === vars.id ? { ...h, done: vars.done } : h))
-        );
-      }
-      return { prev };
-    },
-    onError: (err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
-      toast.error(`Couldn't update habit: ${err instanceof Error ? err.message : "unknown error"}`);
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: key });
-    },
-  });
-}
-
-export function useAddHabit() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (vars: { name: string; icon?: string }) => {
-      const userId = await requireUserId();
-      const { error } = await db()
-        .from("habits")
-        .insert({ user_id: userId, name: vars.name, icon: vars.icon ?? null });
-      if (error) throw new Error(error.message);
+    onMutate: (value) => {
+      qc.setQueryData<number | null>(key, value);
     },
     onError: (err) => {
-      toast.error(`Couldn't add habit: ${err instanceof Error ? err.message : "unknown error"}`);
-    },
-    onSuccess: () => {
-      toast.success("Habit added");
-      qc.invalidateQueries({ queryKey: queryKeys.habits });
-    },
-  });
-}
-
-export function useDeleteHabit() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const userId = await requireUserId();
-      const { error } = await db().from("habits").delete().eq("id", id).eq("user_id", userId);
-      if (error) throw new Error(error.message);
-    },
-    onError: (err) => {
-      toast.error(`Couldn't delete habit: ${err instanceof Error ? err.message : "unknown error"}`);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.habits });
+      void qc.invalidateQueries({ queryKey: key });
+      toast.error(`Couldn't save ${name.toLowerCase()}: ${err instanceof Error ? err.message : "unknown error"}`);
     },
   });
 }

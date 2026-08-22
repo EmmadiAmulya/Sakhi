@@ -4,10 +4,10 @@ import React, { useState } from "react";
 import { Droplet, Sparkles, Bed, Plus, Check, Heart, Stethoscope } from "lucide-react";
 import GlassButton from "@/components/ui/GlassButton";
 import { BentoGrid, BentoCard, NavCard } from "@/components/dashboard/BentoGrid";
-import { mockDailyHabits } from "@/lib/mock-data";
 import { useProfileStore, getCurrentCycleDay, getCyclePhase } from "@/lib/store/profile";
 import { useSupplementsToday, useToggleSupplement } from "@/lib/data/supplements";
 import { useTodayMoodLog, useUpsertMoodLog } from "@/lib/data/mood-logs";
+import { useHabitValue, useSetHabitValue } from "@/lib/data/habits";
 import { useDevSeed } from "@/lib/data/dev-seed";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
@@ -22,14 +22,21 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
   // Dev-only mock seed (no-op unless NEXT_PUBLIC_ENABLE_DEV_SEED=true)
   useDevSeed();
 
-  // Supplements + mood persist to Supabase. Water/sleep remain local because they
-  // are quantitative and don't map onto the boolean habit_logs schema (see SETUP.md).
+  // Supplements + mood + water persist to Supabase. Sleep is display-only
+  // (no input UI yet) so it stays a constant.
   const { data: supplements = [] } = useSupplementsToday();
   const toggleSupp = useToggleSupplement();
   const { data: todayMood } = useTodayMoodLog();
   const upsertMood = useUpsertMoodLog();
 
-  const [waterIntake, setWaterIntake] = useState(mockDailyHabits.waterIntake);
+  const SLEEP_HOURS = 7.5;
+  const SLEEP_TARGET = 8;
+  const WATER_TARGET = 2000;
+
+  const { data: waterData } = useHabitValue("Water");
+  const waterValue = waterData ?? 0;
+  const setWater = useSetHabitValue("Water");
+
   const [selectedMood, setSelectedMood] = useState<string | undefined>(undefined);
   const activeMood = selectedMood ?? todayMood?.mood ?? undefined;
   const [journalNote, setJournalNote] = useState("");
@@ -49,7 +56,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
   };
 
   const addWater = () => {
-    setWaterIntake(prev => Math.min(prev + 250, mockDailyHabits.waterTarget));
+    setWater.mutate(Math.min(waterValue + 250, WATER_TARGET));
   };
 
   const handleSaveNote = (e: React.FormEvent) => {
@@ -62,7 +69,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
     }, 2000);
   };
 
-  const waterProgress = (waterIntake / mockDailyHabits.waterTarget) * 100;
+  const waterProgress = (waterValue / WATER_TARGET) * 100;
   const takenSupplementsCount = supplements.filter(s => s.taken).length;
   const displayName = profile.name || "Amulya";
 
@@ -165,7 +172,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
                 Water Intake
               </span>
               <span className="text-ink-text font-semibold">
-                {waterIntake}ml / {mockDailyHabits.waterTarget}ml
+                {waterValue}ml / {WATER_TARGET}ml
               </span>
             </div>
             <div className="flex items-center gap-2.5">
@@ -177,7 +184,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
               </div>
               <GlassButton 
                 onClick={addWater}
-                disabled={waterIntake >= mockDailyHabits.waterTarget}
+                disabled={waterValue >= WATER_TARGET}
                 className="p-1 h-6 w-6 rounded-full border-sky-400/20 hover:bg-sky-400/10"
                 aria-label="Add 250ml water"
               >
@@ -194,13 +201,13 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
                 Sleep Log
               </span>
               <span className="text-ink-text font-semibold">
-                {mockDailyHabits.sleepHours}h / {mockDailyHabits.sleepTarget}h
+                {SLEEP_HOURS}h / {SLEEP_TARGET}h
               </span>
             </div>
             <div className="h-1.5 bg-border/20 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-purple-400/70 rounded-full" 
-                style={{ width: `${(mockDailyHabits.sleepHours / mockDailyHabits.sleepTarget) * 100}%` }}
+                style={{ width: `${(SLEEP_HOURS / SLEEP_TARGET) * 100}%` }}
               />
             </div>
           </div>
