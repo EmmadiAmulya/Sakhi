@@ -167,7 +167,7 @@ export async function POST(
         ],
         temperature: 0.6,
         top_p: 0.95,
-        max_tokens: 1024,
+        max_tokens: 2048,
       }),
     });
   } catch {
