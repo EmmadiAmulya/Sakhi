@@ -42,55 +42,54 @@ export default function SakhiView({ setActiveTab }: SakhiViewProps) {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const appendBot = (text: string) => {
+    setMessages(prev => [...prev, {
+      id: `sakhi-${Date.now()}`,
+      sender: "bot",
+      text,
+      timestamp: now(),
+    }]);
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputVal.trim()) return;
+    const text = inputVal.trim();
+    if (!text || isTyping) return;
 
     const userMsg: Message = {
       id: `usr-${Date.now()}`,
       sender: "user",
-      text: inputVal,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      text,
+      timestamp: now(),
     };
 
     setMessages(prev => [...prev, userMsg]);
-    const currentInput = inputVal;
     setInputVal("");
     setIsTyping(true);
 
-    // Mock replies based on context
-    setTimeout(() => {
-      setIsTyping(false);
-      
-      const containsMedicalKeywords = /dosage|dose|cramps|pain|bleeding|medicine|pill|medication|doctor|clinic|treatment|diagnose/i.test(currentInput);
-
-      let replyText = `I hear you, ${displayName}. It's completely valid to feel this way during your cycle. Let's focus on taking a deep breath and treating yourself gently today. I am here for you.`;
-      
-      if (containsMedicalKeywords) {
-        replyText = `I want to make sure you get the most accurate medical information, ${displayName}. I can talk you through how you're feeling emotionally, but for symptom analysis and clinical guidance, Maya (our health guide) is better equipped.`;
-      }
-
-      const botMsg: Message = {
-        id: `sakhi-${Date.now()}`,
-        sender: "bot",
-        text: replyText,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setMessages(prev => {
-        const nextMsgs = [...prev, botMsg];
-        if (containsMedicalKeywords) {
-          nextMsgs.push({
-            id: `handoff-${Date.now()}`,
-            sender: "bot",
-            text: "Need medical or symptom advice?",
-            timestamp: "",
-            isSuggestion: true
-          });
-        }
-        return nextMsgs;
+    try {
+      const res = await fetch(`/api/chat/sakhi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: messages
+            .filter(m => m.sender === "user" || (!m.isSuggestion && m.timestamp))
+            .map(m => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
+        }),
       });
-    }, 1500);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.reply) {
+        appendBot(data.reply);
+      } else {
+        appendBot(data?.error ?? `Sorry ${displayName}, I couldn't respond just now. Please try again in a moment.`);
+      }
+    } catch {
+      appendBot(`Sorry ${displayName}, I couldn't reach the server. Please check your connection and try again.`);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (

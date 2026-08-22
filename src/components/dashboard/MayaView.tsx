@@ -43,74 +43,55 @@ export default function MayaView({ setActiveTab }: MayaViewProps) {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const appendBot = (text: string, isEmergency = false) => {
+    setMessages(prev => [...prev, {
+      id: `maya-${Date.now()}`,
+      sender: "bot",
+      text,
+      timestamp: now(),
+      isEmergency,
+    }]);
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputVal.trim()) return;
+    const text = inputVal.trim();
+    if (!text || isTyping) return;
 
     const userMsg: Message = {
       id: `usr-${Date.now()}`,
       sender: "user",
-      text: inputVal,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      text,
+      timestamp: now(),
     };
 
     setMessages(prev => [...prev, userMsg]);
-    const currentInput = inputVal;
     setInputVal("");
     setIsTyping(true);
 
-    // Mock replies based on clinical context
-    setTimeout(() => {
-      setIsTyping(false);
-      
-      const containsEmergencyKeywords = /severe bleeding|haemorrhage|extreme cramps|severe pain|fainting|unconscious|fever|seizure/i.test(currentInput);
-      const containsEmotionalKeywords = /sad|depressed|lonely|anxious|stress|cry|overwhelmed|mood/i.test(currentInput);
-
-      let replyText = `For general wellness, here is a structured summary based on peer-reviewed guidelines:
-• Ensure proper hydration (water, electrolytes) to stabilize metabolism.
-• Micronutrients like Magnesium Glycinate (200mg) and Vitamin D3 (2000 IU) support cycle regulation.
-• Engage in low-intensity restorative movement (yoga, walking).
-
-If symptoms persist, please consult a qualified clinician.`;
-      
-      if (containsEmergencyKeywords) {
-        replyText = `WARNING: The symptoms you described (severe pain, heavy bleeding, or high fever) may require immediate medical attention. Do not delay seeking professional treatment. Please refer to the emergency contacts provided below.`;
-      } else if (containsEmotionalKeywords) {
-        replyText = `I can provide nutritional recommendations and cycle support parameters. However, for emotional grounding, stress, and mood reflections, Sakhi is our dedicated companion.`;
-      }
-
-      const botMsg: Message = {
-        id: `maya-${Date.now()}`,
-        sender: "bot",
-        text: replyText,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isEmergency: containsEmergencyKeywords
-      };
-
-      setMessages(prev => {
-        const nextMsgs = [...prev, botMsg];
-        
-        if (containsEmergencyKeywords) {
-          nextMsgs.push({
-            id: `emergency-card-${Date.now()}`,
-            sender: "bot",
-            text: "Emergency Helpline Directory",
-            timestamp: "",
-            isEmergency: true
-          });
-        } else if (containsEmotionalKeywords) {
-          nextMsgs.push({
-            id: `handoff-sakhi-${Date.now()}`,
-            sender: "bot",
-            text: "Need emotional support?",
-            timestamp: "",
-            isSuggestion: true
-          });
-        }
-        
-        return nextMsgs;
+    try {
+      const res = await fetch(`/api/chat/maya`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: messages
+            .filter(m => m.sender === "user" || (!m.isSuggestion && !m.isEmergency && m.timestamp))
+            .map(m => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
+        }),
       });
-    }, 1500);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.reply) {
+        appendBot(data.reply);
+      } else {
+        appendBot(data?.error ?? `Sorry ${displayName}, I couldn't respond just now. Please try again in a moment.`);
+      }
+    } catch {
+      appendBot(`Sorry ${displayName}, I couldn't reach the server. Please check your connection and try again.`);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (
