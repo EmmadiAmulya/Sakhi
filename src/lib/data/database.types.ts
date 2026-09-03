@@ -1,10 +1,9 @@
 /**
  * Hand-written Supabase database types matching supabase/migrations/*.sql.
  *
- * The Supabase CLI (`supabase gen types typescript`) can regenerate this once the
- * migration is applied and the CLI is linked to the project — see SETUP.md. Until
- * then (and because the migration is not yet applied) these are maintained by hand
- * to mirror 0001_init.sql and 0002_rag.sql exactly.
+ * The Supabase CLI (`supabase gen types typescript`) can regenerate this once
+ * the CLI is linked to the project — see docs. Until then these are maintained
+ * by hand to mirror 0001_init.sql, 0002_rag.sql and 0003_habit_values.sql exactly.
  */
 
 export type Flow = "spotting" | "light" | "medium" | "heavy";
@@ -73,6 +72,7 @@ export interface HabitLogRow {
   habit_id: string;
   log_date: string;
   done: boolean | null;
+  value: number | null; // 0003_habit_values.sql — quantitative metrics (ml, hours)
 }
 
 export interface SupplementRow {
@@ -134,6 +134,4 @@ export interface DocumentChunkRow {
   document_id: string;
   content: string;
   embedding: number[] | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
 }

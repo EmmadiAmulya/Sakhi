@@ -43,3 +43,12 @@ pnpm dev      # http://localhost:3000
 pnpm lint
 npx tsc --noEmit
 ```
+
+## Documentation
+
+- [`docs/architecture.md`](docs/architecture.md) — how Sakhi fits together and why
+- [`docs/reference-data-layer.md`](docs/reference-data-layer.md) — every data hook, table, route, and env var
+- [`docs/howto-add-tracker.md`](docs/howto-add-tracker.md) — add a new daily tracker end to end
+- [`docs/howto-operate.md`](docs/howto-operate.md) — migrations, RAG ingestion, deploys, troubleshooting
+- [`docs/`](docs/) also holds the product specs (PRD, feature specs, AI safety
+  design, data model) and the research corpus that powers Maya's RAG.
