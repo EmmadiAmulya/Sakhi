@@ -13,9 +13,7 @@ function rowToReminders(row: ReminderPreferencesRow): ReminderPreferences {
   const dailyLogNudge = row.log_nudge ?? false;
   const supplementAlert = row.supplement_reminder ?? false;
   return {
-    // `enabled` is a client-only master switch (no DB column); derive it as
-    // "any sub-toggle is on" on hydrate.
-    enabled: upcomingPeriod || dailyLogNudge || supplementAlert,
+    enabled: row.enabled ?? (upcomingPeriod || dailyLogNudge || supplementAlert),
     upcomingPeriod,
     dailyLogNudge,
     supplementAlert,
@@ -57,6 +55,7 @@ export function useUpdateReminders() {
         .upsert(
           {
             user_id: userId,
+            enabled: merged.enabled,
             period_reminder: merged.upcomingPeriod,
             log_nudge: merged.dailyLogNudge,
             supplement_reminder: merged.supplementAlert,

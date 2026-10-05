@@ -116,7 +116,7 @@ export default function LoginView() {
                 <div className="text-center pt-2">
                   <p className="text-[10px] text-ink-soft/80 leading-normal px-2">
                     Sakhi is designed with cloud data persistence &amp; strict privacy.
-                    Your entries are securely synced and never shared.
+                    Stored in your private account and protected by row-level security — only you can access it.
                   </p>
                 </div>
               </motion.form>

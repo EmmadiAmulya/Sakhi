@@ -92,7 +92,7 @@ export default function TrendsView() {
           <div className="max-w-xs mx-auto space-y-1">
             <h3 className="text-sm font-bold text-ink-text font-serif">Insufficient Data</h3>
             <p className="text-xs text-ink-soft leading-relaxed">
-              Log details for at least <span className="font-bold text-sakura-deep">3 days</span> in your cycle calendar to initialize visual mood curves, energy analytics, and symptom frequency frequencies.
+              Log details for at least <span className="font-bold text-sakura-deep">3 days</span> in your cycle calendar to initialize visual mood curves, energy analytics, and symptom frequency.
             </p>
           </div>
         </GlassCard>

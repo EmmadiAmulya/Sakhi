@@ -79,7 +79,7 @@ export default function OnboardingForm({ onSuccess, isEditing = false }: Onboard
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-lg z-10"
       >
-        <GlassCard className="p-6 md:p-8 space-y-6 rounded-3xl border border-border bg-gradient-to-tr from-surface-white/40 via-surface-white/20 to-surface-white/50 backdrop-blur-xl saturate-[140%] shadow-glass shadow-glass-inset">
+        <GlassCard animateEntrance={!isEditing} className="p-6 md:p-8 space-y-6 rounded-3xl border border-border bg-gradient-to-tr from-surface-white/40 via-surface-white/20 to-surface-white/50 backdrop-blur-xl saturate-[140%] shadow-glass shadow-glass-inset">
           
           {/* Header */}
           {!isEditing && (

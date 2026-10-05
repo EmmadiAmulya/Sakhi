@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Droplet, Sparkles, Bed, Plus, Check, Heart, Stethoscope } from "lucide-react";
+import { Droplet, Sparkles, Bed, Plus, Minus, Check, Heart, Stethoscope } from "lucide-react";
 import GlassButton from "@/components/ui/GlassButton";
 import { BentoGrid, BentoCard, NavCard } from "@/components/dashboard/BentoGrid";
 import { useProfileStore, getCurrentCycleDay, getCyclePhase } from "@/lib/store/profile";
@@ -10,6 +10,7 @@ import { useTodayMoodLog, useUpsertMoodLog } from "@/lib/data/mood-logs";
 import { useHabitValue, useSetHabitValue } from "@/lib/data/habits";
 import { useAddJournalEntry } from "@/lib/data/journal";
 import { useDevSeed } from "@/lib/data/dev-seed";
+import { MOODS } from "@/lib/moods";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
 
@@ -31,7 +32,6 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
   const upsertMood = useUpsertMoodLog();
   const addJournalEntry = useAddJournalEntry();
 
-  const SLEEP_HOURS = 7.5;
   const SLEEP_TARGET = 8;
   const WATER_TARGET = 2000;
 
@@ -39,17 +39,22 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
   const waterValue = waterData ?? 0;
   const setWater = useSetHabitValue("Water");
 
+  const { data: sleepData } = useHabitValue("Sleep");
+  const sleepValue = sleepData ?? 0;
+  const setSleep = useSetHabitValue("Sleep");
+
   const [selectedMood, setSelectedMood] = useState<string | undefined>(undefined);
   const activeMood = selectedMood ?? todayMood?.mood ?? undefined;
   const [journalNote, setJournalNote] = useState("");
   const [noteSaved, setNoteSaved] = useState(false);
 
   // Dynamically compute cycle status
+  const hasCycleData = !!profile.lastPeriodDate;
   const cycleDay = getCurrentCycleDay(profile.lastPeriodDate, profile.cycleLength);
   const phase = getCyclePhase(cycleDay, profile.cycleLength);
-  const daysUntilNextPeriod = profile.lastPeriodDate
+  const daysUntilNextPeriod = hasCycleData
     ? Math.max(0, profile.cycleLength - cycleDay)
-    : 16;
+    : 0;
 
   const toggleSupplement = (id: string) => {
     const current = supplements.find((s) => s.id === id);
@@ -60,6 +65,13 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
   const addWater = () => {
     setWater.mutate(Math.min(waterValue + 250, WATER_TARGET));
   };
+
+  const adjustSleep = (delta: number) => {
+    const next = Math.round(Math.min(24, Math.max(0, sleepValue + delta)) * 10) / 10;
+    setSleep.mutate(next);
+  };
+
+  const sleepProgress = Math.min(100, (sleepValue / SLEEP_TARGET) * 100);
 
   const handleSaveNote = (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,8 +125,19 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
           こんにちは, <span className="text-sakura-deep">{displayName}</span>
         </h1>
         <p className="text-sm md:text-base text-ink-soft max-w-2xl leading-relaxed">
-          Your body is in the <span className="font-semibold text-plum">{phase.name}</span> (Day {cycleDay} of {profile.cycleLength}). Estrogen is rising, supporting focus and creative projects.
+          {hasCycleData ? (
+            <>
+              Your body is in the <span className="font-semibold text-plum">{phase.name}</span> (Day {cycleDay} of {profile.cycleLength}). {phase.description}
+            </>
+          ) : (
+            "Add your last period date in Settings to unlock cycle predictions and phase insights."
+          )}
         </p>
+        {!hasCycleData && (
+          <GlassButton variant="secondary" className="text-xs" onClick={() => setActiveTab("settings")}>
+            Open Settings
+          </GlassButton>
+        )}
       </section>
 
       {/* Restructured Bento Grid Layout */}
@@ -125,6 +148,19 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
           span={2} 
           className="flex flex-col md:flex-row items-center gap-8 justify-between min-h-[220px]"
         >
+          {!hasCycleData ? (
+            <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left gap-3">
+              <Sparkles className="h-6 w-6 text-sakura-deep" />
+              <h2 className="text-lg font-bold text-ink-text font-serif">Unlock Your Cycle Insights</h2>
+              <p className="text-xs leading-relaxed text-ink-soft max-w-md">
+                Add your last period date in Settings to unlock cycle predictions and phase insights.
+              </p>
+              <GlassButton variant="primary" onClick={() => setActiveTab("settings")}>
+                Go to Settings
+              </GlassButton>
+            </div>
+          ) : (
+          <>
           {/* Visual Cycle Progress Ring */}
           <div 
             onClick={() => setActiveTab("cycle")}
@@ -182,6 +218,8 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
               </GlassButton>
             </div>
           </div>
+          </>
+          )}
         </BentoCard>
 
         {/* Card 2: Daily Habits (Span 1) */}
@@ -227,35 +265,53 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
                 Sleep Log
               </span>
               <span className="text-ink-text font-semibold">
-                {SLEEP_HOURS}h / {SLEEP_TARGET}h
+                {sleepValue}h / {SLEEP_TARGET}h
               </span>
             </div>
-            <div className="h-1.5 bg-border/20 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-purple-400/70 rounded-full" 
-                style={{ width: `${(SLEEP_HOURS / SLEEP_TARGET) * 100}%` }}
-              />
+            <div className="flex items-center gap-2.5">
+              <GlassButton
+                onClick={() => adjustSleep(-0.5)}
+                disabled={sleepValue <= 0}
+                className="p-1 h-6 w-6 rounded-full border-purple-400/20 hover:bg-purple-400/10"
+                aria-label="Decrease sleep by 0.5h"
+              >
+                <Minus className="h-3 w-3 text-purple-500" />
+              </GlassButton>
+              <div className="flex-1 h-1.5 bg-border/20 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-purple-400/70 rounded-full transition-all duration-500"
+                  style={{ width: `${sleepProgress}%` }}
+                />
+              </div>
+              <GlassButton
+                onClick={() => adjustSleep(0.5)}
+                disabled={sleepValue >= 24}
+                className="p-1 h-6 w-6 rounded-full border-purple-400/20 hover:bg-purple-400/10"
+                aria-label="Increase sleep by 0.5h"
+              >
+                <Plus className="h-3 w-3 text-purple-500" />
+              </GlassButton>
             </div>
           </div>
 
           {/* Mood Buttons */}
           <div className="space-y-1.5 pt-1.5 border-t border-border/20">
             <span className="text-[11px] font-medium text-ink-soft">Daily Mood</span>
-            <div className="flex gap-1 justify-between">
-              {(["serene", "energetic", "sensitive", "fatigued", "reflective"] as const).map((m) => (
+            <div className="flex flex-wrap gap-1">
+              {MOODS.map((m) => (
                 <button
-                  key={m}
+                  key={m.id}
                   onClick={() => {
-                    setSelectedMood(m);
-                    upsertMood.mutate({ mood: m });
+                    setSelectedMood(m.id);
+                    upsertMood.mutate({ mood: m.id });
                   }}
-                  className={`flex-1 py-1 rounded-md text-[9px] font-semibold transition-all capitalize cursor-pointer border ${
-                    activeMood === m
+                  className={`px-2 py-1 rounded-md text-[9px] font-semibold transition-all cursor-pointer border ${
+                    activeMood === m.id
                       ? "bg-sakura-deep/15 text-sakura-deep border-sakura-deep/30 shadow-inner"
                       : "bg-surface-glass/40 border-transparent text-ink-soft hover:bg-surface-glass/85"
                   }`}
                 >
-                  {m}
+                  {m.label}
                 </button>
               ))}
             </div>

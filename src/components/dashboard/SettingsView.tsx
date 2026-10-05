@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Settings, Lock, HardDrive, Bell, User, AlertCircle } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
@@ -8,18 +8,25 @@ import { useProfileStore } from "@/lib/store/profile";
 import { useRemindersSync, useUpdateReminders } from "@/lib/data/reminders";
 import OnboardingForm from "@/components/auth/OnboardingForm";
 import { createClient } from "@/lib/supabase/client";
+import { db, requireUserId } from "@/lib/data/client";
+import { fetchUserDataExport, downloadUserDataExport, importUserDataExport } from "@/lib/data/export";
+import { toast } from "@/lib/toast";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
 
 export default function SettingsView() {
-  const [anonymity, setAnonymity] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<string>(() => {
+  const [permissionStatus, setPermissionStatus] = useState<string>("default");
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
-      return Notification.permission;
+      setPermissionStatus(Notification.permission);
     }
-    return "default";
-  });
+  }, []);
 
   const profile = useProfileStore((s) => s.profile);
   const logout = useProfileStore((s) => s.logout);

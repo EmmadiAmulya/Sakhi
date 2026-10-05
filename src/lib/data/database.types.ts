@@ -26,6 +26,7 @@ export interface ProfileRow {
 
 export interface ReminderPreferencesRow {
   user_id: string;
+  enabled: boolean;
   period_reminder: boolean | null;
   log_nudge: boolean | null;
   supplement_reminder: boolean | null;

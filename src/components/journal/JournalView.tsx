@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { BookOpen, Sparkles, Trash2, CalendarHeart, Plus, ArrowLeft } from "lucide-react";
 import { useProfileStore } from "@/lib/store/profile";
@@ -47,9 +47,12 @@ export default function JournalView() {
   const updateEntry = useUpdateJournalEntry();
   const deleteEntry = useDeleteJournalEntry();
 
-  const [activeEntryId, setActiveEntryId] = useState<string | "new" | null>(null);
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [selectedMood, setSelectedMood] = useState<string | undefined>(undefined);
   const [promptIndex, setPromptIndex] = useState(0);
+  // Stable draft id + timestamp for the open editor session. Held in a ref so
+  // Tiptap's captured onSave closure can never mint a second id on retry.
+  const draftRef = useRef<{ id: string; createdAt: string } | null>(null);
 
   // Compute current cycle phase to auto-stamp entries
   const { cycleLength: refinedCycleLength, periodLength: refinedPeriodLength } = refineCycleMetrics(
@@ -67,28 +70,35 @@ export default function JournalView() {
   const currentPhaseId = currentCalc.phase.id;
 
   const handleCreateNew = () => {
-    setActiveEntryId("new");
+    const id = crypto.randomUUID();
+    draftRef.current = { id, createdAt: new Date().toISOString() };
+    setActiveEntryId(id);
     setSelectedMood(undefined);
   };
 
-  const handleSaveNew = (contentJSON: JSONContent, contentText: string) => {
-    // Persist via the data hook (optimistic store update + rollback + toast).
-    addEntry.mutate({
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      contentJSON,
-      contentText,
-      mood: selectedMood,
-      cyclePhase: currentPhaseId,
-    });
-    setActiveEntryId(null);
-  };
-
-  const handleUpdate = (id: string, contentJSON: JSONContent, contentText: string) => {
-    updateEntry.mutate({ id, contentJSON, contentText, mood: selectedMood });
+  const handleSave = (contentJSON: JSONContent, contentText: string) => {
+    const draft = draftRef.current;
+    if (!draft) return;
+    // Read the store imperatively: the optimistic add lands there on mutate,
+    // so a fresh getState() check can never double-insert on a stale closure.
+    const persisted = useProfileStore.getState().journalEntries.some((e) => e.id === draft.id);
+    if (!persisted) {
+      if (!contentText.trim()) return;
+      addEntry.mutate({
+        id: draft.id,
+        createdAt: draft.createdAt,
+        contentJSON,
+        contentText,
+        mood: selectedMood,
+        cyclePhase: currentPhaseId,
+      });
+    } else {
+      updateEntry.mutate({ id: draft.id, contentJSON, contentText, mood: selectedMood });
+    }
   };
 
   const activeEntry = journalEntries.find((e) => e.id === activeEntryId);
+  const isSaving = addEntry.isPending || updateEntry.isPending;
 
   return (
     <motion.div
@@ -122,15 +132,20 @@ export default function JournalView() {
                 </GlassButton>
                 <div>
                   <h3 className="text-xs font-bold text-ink-text font-serif">
-                    {activeEntryId === "new" ? "New Reflection" : "Edit Reflection"}
+                    {activeEntry ? "Edit Reflection" : "New Reflection"}
                   </h3>
                   <p className="text-[10px] text-ink-soft">
-                    Stamped: <span className="font-semibold text-sakura-deep">{getPhaseName(currentPhaseId)}</span>
+                    Stamped: <span className="font-semibold text-sakura-deep">{getPhaseName(activeEntry ? activeEntry.cyclePhase : currentPhaseId)}</span>
                   </p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full select-none">
-                Autosaving...
+              <span
+                aria-live="polite"
+                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full select-none ${
+                  isSaving ? "text-plum bg-plum/10" : "text-emerald-600 bg-emerald-50"
+                }`}
+              >
+                {isSaving ? "Saving..." : "Saved"}
               </span>
             </div>
 
@@ -171,7 +186,7 @@ export default function JournalView() {
             </GlassCard>
 
             {/* Prompt nudge card (only for new entries) */}
-            {activeEntryId === "new" && (
+            {!activeEntry && (
               <GlassCard className="p-4 space-y-2 flex-shrink-0 bg-sakura/5 border-sakura-deep/10">
                 <span className="text-[10px] font-bold text-sakura-deep flex items-center gap-1.5">
                   <Sparkles className="h-3.5 w-3.5" />
@@ -195,18 +210,12 @@ export default function JournalView() {
             <div className="flex-1 min-h-0 bg-surface-white/20 rounded-2xl">
               <DynamicEditor
                 initialContentJSON={activeEntry ? activeEntry.contentJSON : null}
-                onSave={(json, text) => {
-                  if (activeEntryId === "new") {
-                    handleSaveNew(json, text);
-                  } else {
-                    handleUpdate(activeEntryId, json, text);
-                  }
-                }}
+                onSave={handleSave}
               />
             </div>
-            
+
             <div className="text-[10px] text-ink-soft/70 text-center flex-shrink-0">
-              Your journal entries are encrypted and saved strictly in your local browser state.
+              Your entries are stored in your private account and visible only to you.
             </div>
 
           </motion.div>
@@ -270,6 +279,7 @@ export default function JournalView() {
                       >
                         <GlassCard
                           onClick={() => {
+                            draftRef.current = { id: entry.id, createdAt: entry.createdAt };
                             setActiveEntryId(entry.id);
                             setSelectedMood(entry.mood);
                           }}
@@ -297,14 +307,14 @@ export default function JournalView() {
                             {entry.contentText || "Empty reflection... Click to write notes."}
                           </p>
 
-                          <div className="flex justify-end pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex justify-end pt-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 deleteEntry.mutate(entry.id);
                               }}
-                              className="p-1 rounded text-red-500 hover:bg-red-500/10 cursor-pointer"
+                              className="p-2 rounded text-red-500 hover:bg-red-500/10 focus-visible:ring-2 focus-visible:ring-red-400/60 cursor-pointer"
                               aria-label="Delete entry"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
