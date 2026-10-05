@@ -102,7 +102,13 @@ test("calculateCycle: calculates timeline, fertile window, and period prediction
 
 test("getCurrentCycleDay: computes modular cycle day correctly", () => {
   assert.equal(getCurrentCycleDay(null, 28), 12); // Default fallback
-  assert.equal(getCurrentCycleDay(new Date().toISOString().slice(0, 10), 28), 1); // Day 1
+  // Local date, not toISOString(): the helper compares local midnights, so a
+  // UTC date drifts a day during the local-midnight/UTC gap.
+  const now = new Date();
+  const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
+  assert.equal(getCurrentCycleDay(localToday, 28), 1); // Day 1
 });
 
 test("getPhaseName: maps every stored phase id, passes through legacy/empty", () => {

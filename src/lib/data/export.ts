@@ -159,7 +159,8 @@ export async function importUserDataExport(
   // Profile: id column mirrors the auth user id, so overwrite that instead.
   if (raw.profile) {
     const err = await upsertTable("profiles", [{ ...raw.profile, id: userId }], "id");
-    err ? errors.push(`profiles: ${err}`) : imported.push("profiles");
+    if (err) errors.push(`profiles: ${err}`);
+    else imported.push("profiles");
   }
 
   const exportedHabits = raw.habits as Record<string, unknown>[];
@@ -239,7 +240,8 @@ export async function importUserDataExport(
 
   if (raw.reminder_preferences) {
     const err = await upsertTable("reminder_preferences", [own(raw.reminder_preferences)], "user_id");
-    err ? errors.push(`reminder_preferences: ${err}`) : imported.push("reminder_preferences");
+    if (err) errors.push(`reminder_preferences: ${err}`);
+    else imported.push("reminder_preferences");
   }
 
   const exportedSessions = raw.chat_sessions as Record<string, unknown>[];

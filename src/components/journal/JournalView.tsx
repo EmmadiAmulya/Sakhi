@@ -68,6 +68,7 @@ export default function JournalView() {
     new Date()
   );
   const currentPhaseId = currentCalc.phase.id;
+  const hasCycleData = !!profile.lastPeriodDate;
 
   const handleCreateNew = () => {
     const id = crypto.randomUUID();
@@ -90,7 +91,7 @@ export default function JournalView() {
         contentJSON,
         contentText,
         mood: selectedMood,
-        cyclePhase: currentPhaseId,
+        cyclePhase: hasCycleData ? currentPhaseId : "",
       });
     } else {
       updateEntry.mutate({ id: draft.id, contentJSON, contentText, mood: selectedMood });
@@ -135,7 +136,7 @@ export default function JournalView() {
                     {activeEntry ? "Edit Reflection" : "New Reflection"}
                   </h3>
                   <p className="text-[10px] text-ink-soft">
-                    Stamped: <span className="font-semibold text-sakura-deep">{getPhaseName(activeEntry ? activeEntry.cyclePhase : currentPhaseId)}</span>
+                    Stamped: <span className="font-semibold text-sakura-deep">{activeEntry ? getPhaseName(activeEntry.cyclePhase) || "—" : hasCycleData ? getPhaseName(currentPhaseId) : "—"}</span>
                   </p>
                 </div>
               </div>

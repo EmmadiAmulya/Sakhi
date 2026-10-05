@@ -92,7 +92,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
         },
         contentText: note,
         mood: activeMood,
-        cyclePhase: phase.id,
+        cyclePhase: hasCycleData ? phase.id : "",
       },
       {
         onSuccess: () => {

@@ -35,7 +35,7 @@ exits 1 — do not deploy RAG changes until it passes.
 
 ## Deploy checklist
 
-- [ ] Migrations 0001–0005 applied (verify: `GET /api/health` → `"ok": true`,
+- [ ] Migrations 0001–0006 applied (verify: `GET /api/health` → `"ok": true`,
       `"rag": {"ok": true, ...}`).
 - [ ] Vercel env vars set: the two `NEXT_PUBLIC_*` keys plus
       `SUPABASE_SERVICE_ROLE_KEY` and `NVIDIA_NIM_API_KEY` (server only).

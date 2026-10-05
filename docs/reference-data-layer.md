@@ -50,7 +50,7 @@ Every module follows the same shape (copied from `mood-logs.ts`):
 | `useHabitValue(name)` | hook | today's `habit_logs.value` for the named habit; `null` when unlogged |
 | `useSetHabitValue(name)` | mutation | `(value)`; auto-creates the `habits` row on first use (unique `(user_id, name)` in 0005; insert races re-read); upserts on `(habit_id, log_date)`; sets `done = value > 0` |
 
-Habit names in use: `"Water"`. Sleep is display-only (no setter wired).
+Habit names in use: `"Water"` (ml) and `"Sleep"` (hours, ±0.5h stepper on the dashboard).
 
 ### supplements.ts
 
@@ -74,7 +74,7 @@ Habit names in use: `"Water"`. Sleep is display-only (no setter wired).
 
 | Export | Kind | Notes |
 |---|---|---|
-| `fetchReminders()` / `useRemindersSync()` / `useUpdateReminders()` | as above | DB columns are `period_reminder`/`log_nudge`/`supplement_reminder`/`reminder_time` (`HH:MM:SS`); `enabled` is client-only, derived as "any sub-toggle on" |
+| `fetchReminders()` / `useRemindersSync()` / `useUpdateReminders()` | as above | DB columns are `period_reminder`/`log_nudge`/`supplement_reminder`/`reminder_time` (`HH:MM:SS`) plus the master `enabled` flag (0006); `enabled` falls back to "any sub-toggle on" for pre-0006 rows |
 
 ### chat.ts
 
@@ -88,6 +88,14 @@ Habit names in use: `"Water"`. Sleep is display-only (no setter wired).
 |---|---|---|
 | `DEV_SEED_ENABLED` | const | `NEXT_PUBLIC_ENABLE_DEV_SEED === "true"` |
 | `useDevSeed()` | hook | inserts 30 days of cycle logs + 2 journal entries once, only when the user has zero logs; mounted by `DashboardView` |
+
+### export.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `fetchUserDataExport()` | async | RLS-scoped JSON snapshot of every user table plus `version`/`exportedAt` |
+| `downloadUserDataExport(data)` | fn | triggers a `sakhi-export-YYYY-MM-DD.json` download |
+| `importUserDataExport(raw)` | async | validates a backup, remaps habit/supplement/session ids, upserts idempotently; returns `{imported, errors}` |
 
 ### keys.ts
 
@@ -122,6 +130,7 @@ chatSessions(persona), chatMessages(sessionId)
 - **0003** — `habit_logs.value numeric` for quantitative metrics.
 - **0004** — integrity: `mood_logs` unique `(user_id, log_date)`; `habit_logs`/`supplement_logs` gain `created_at`/`updated_at` + update triggers; lookup indexes; timestamp columns `NOT NULL`; `mood` constrained to the 10 UI ids and `cycle_phase` normalized from display names to ids (`menstrual`/`follicular`/`ovulatory`/`luteal`) then constrained. `journal_entries.cycle_phase` now stores the phase **id**; the UI maps it back via `getPhaseName()` (`lib/cycle.ts`).
 - **0005** — `habits` unique `(user_id, name)` (dedupes first, repointing/trimming `habit_logs`) — fixes PGRST116 from duplicate water/habit rows created by the old select-then-insert race.
+- **0006** — `reminder_preferences.enabled boolean not null default false` (backfilled as "any sub-toggle on") so the Settings master switch persists.
 
 Hand-maintained TS mirrors live in `lib/data/database.types.ts` (regenerate
 via `supabase gen types` once the CLI is linked).

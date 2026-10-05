@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { Settings, Lock, HardDrive, Bell, User, AlertCircle } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
@@ -16,17 +16,13 @@ import { pageVariants } from "@/lib/motion";
 
 export default function SettingsView() {
   const [isEditing, setIsEditing] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<string>("default");
+  const [permissionStatus, setPermissionStatus] = useState<string>(() =>
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
+  );
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      setPermissionStatus(Notification.permission);
-    }
-  }, []);
 
   const profile = useProfileStore((s) => s.profile);
   const logout = useProfileStore((s) => s.logout);

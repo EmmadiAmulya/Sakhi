@@ -30,7 +30,7 @@ SUPABASE_SERVICE_ROLE_KEY=   # server only — health check, RAG ingestion
 NVIDIA_NIM_API_KEY=nvapi-... # server only
 ```
 
-Apply migrations `0001`–`0005` in the Supabase SQL editor, then build the knowledge base once:
+Apply migrations `0001`–`0006` in the Supabase SQL editor, then build the knowledge base once:
 
 ```bash
 node scripts/ingest.mjs
