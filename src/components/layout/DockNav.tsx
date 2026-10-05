@@ -2,7 +2,7 @@
 
 import React from "react";
 import { LayoutDashboard, CalendarHeart, Heart, Stethoscope, BookOpen, Settings } from "lucide-react";
-import Dock, { DockItemData } from "@/components/Dock";
+import Dock, { DockItemData } from "./Dock";
 
 interface DockNavProps {
   activeTab: string;

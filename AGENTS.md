@@ -30,3 +30,12 @@ Rules:
 Not lazy about: understanding the problem (read it fully and trace the real flow before picking a rung, a small diff you don't understand is just laziness dressed up as efficiency), input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal, a clock drifts, a sensor reads off), anything explicitly requested. Lazy code without its check is unfinished: non-trivial logic leaves ONE runnable check behind, the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.
 
 (Yes, this file also applies to agents working on the ponytail repo itself. Especially to them.)
+
+## Project conventions (Sakhi)
+
+- Components: PascalCase file per component with `export default`; `components/ui/*` keep the shadcn named-export style. Views live in their feature folder (`dashboard/`, `cycle/`, `journal/`, `chat/`).
+- Imports: `@/` alias across directories; relative `./` only for same-directory siblings.
+- Shared constants: dates in `lib/date.ts`, mood options in `lib/moods.ts`, persona config in `lib/personas.ts`. Don't re-declare these in components.
+- Chat: both personas render through `components/chat/PersonaChat.tsx` + `usePersonaChat`. Add persona differences to `PERSONAS`, never a new view.
+- Data: reads rely on RLS; mutations call `requireUserId()`; follow the module shape in `docs/reference-data-layer.md`.
+- Verify with `pnpm lint`, `npx tsc --noEmit`, `pnpm test`.

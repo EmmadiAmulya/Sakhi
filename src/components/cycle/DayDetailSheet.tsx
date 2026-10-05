@@ -5,6 +5,7 @@ import { X, Droplet, Sparkles, Smile, Flame, BookOpen, Trash2 } from "lucide-rea
 import { useProfileStore } from "@/lib/store/profile";
 import { useUpsertCycleLog, useDeleteCycleLog } from "@/lib/data/cycle-logs";
 import { CycleLog } from "@/lib/cycle";
+import { MOODS } from "@/lib/moods";
 import GlassButton from "@/components/ui/GlassButton";
 import { format } from "date-fns";
 
@@ -24,19 +25,6 @@ const SYMPTOM_LIBRARY = [
   "Nausea",
   "Breast Tenderness",
   "Insomnia",
-];
-
-const MOODS = [
-  { id: "serene", label: "Serene 🌸" },
-  { id: "energetic", label: "Energetic ⚡" },
-  { id: "sensitive", label: "Sensitive 🥺" },
-  { id: "fatigued", label: "Fatigued 😴" },
-  { id: "reflective", label: "Reflective 🧘" },
-  { id: "anxious", label: "Anxious 😰" },
-  { id: "down", label: "Down 😔" },
-  { id: "happy", label: "Happy 😊" },
-  { id: "stressed", label: "Stressed 😫" },
-  { id: "irritable", label: "Irritable 😠" },
 ];
 
 export default function DayDetailSheet({ date, onClose }: DayDetailSheetProps) {

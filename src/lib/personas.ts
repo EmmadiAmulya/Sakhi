@@ -13,8 +13,12 @@ export interface Persona {
   accentClass: string;
   textAccentClass: string;
   bgAccentClass: string;
+  bgAccentHoverClass: string;
   borderColorClass: string;
-  avatarIcon: string;
+  ringAccentClass: string;
+  buttonClass: string;
+  avatarIcon: "Heart" | "Stethoscope";
+  inputPlaceholder: string;
   systemPrompt: string;
   introMessage: string;
   disclaimer?: string;
@@ -31,8 +35,12 @@ export const PERSONAS: Record<"sakhi" | "maya", Persona> = {
     accentClass: "sakura-deep",
     textAccentClass: "text-sakura-deep",
     bgAccentClass: "bg-sakura-deep/15",
+    bgAccentHoverClass: "hover:bg-sakura-deep/20",
     borderColorClass: "border-sakura-deep/30",
+    ringAccentClass: "focus:ring-sakura-deep/30",
+    buttonClass: "",
     avatarIcon: "Heart",
+    inputPlaceholder: "Talk to Sakhi...",
     systemPrompt: `You are Sakhi, a warm, non-judgmental, and deeply empathetic friend and companion for women's wellness. 
 Your core mission is to provide emotional validation, support, comfort, and listening space for mood swings, stress, anxiety, and cycle-related feelings.
 TREATMENT RULES:
@@ -51,8 +59,12 @@ TREATMENT RULES:
     accentClass: "plum",
     textAccentClass: "text-plum",
     bgAccentClass: "bg-plum/15",
+    bgAccentHoverClass: "hover:bg-plum/20",
     borderColorClass: "border-plum/30",
+    ringAccentClass: "focus:ring-plum/35",
+    buttonClass: "bg-plum hover:bg-plum-hover text-white border-transparent",
     avatarIcon: "Stethoscope",
+    inputPlaceholder: "Ask Maya about symptoms, cycle phases, and remedies...",
     disclaimer: "General information, not a medical diagnosis. Consult a qualified professional for personal medical advice.",
     systemPrompt: `You are Maya, a clinical reference guide and women's health advisor. 
 Your mission is to provide science-backed, peer-reviewed, and evidence-grounded information on menstrual health, hormones, nutrition, and bodily symptoms.
@@ -72,11 +84,11 @@ TREATMENT RULES:
         { name: "AASRA Suicide Support", number: "91-9820466726", description: "24/7 volunteer-run suicide prevention and crisis line" },
         { name: "Vandrevala Foundation", number: "9999 666 555", description: "Free mental health counseling and crisis support" }
       ],
-      UnitedStates: [
+      "United States": [
         { name: "Emergency Services", number: "911", description: "24/7 Police, Fire, and Medical response" },
         { name: "Crisis & Suicide Lifeline", number: "988", description: "Free, confidential 24/7 suicide & crisis support" }
       ],
-      UnitedKingdom: [
+      "United Kingdom": [
         { name: "Emergency Services", number: "999", description: "Primary emergency response operator" },
         { name: "NHS Non-Emergency Health", number: "111", description: "Urgent care advice and mental health pathways" }
       ]

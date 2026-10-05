@@ -12,6 +12,7 @@ import {
 } from "@/lib/data/journal";
 import type { JSONContent } from "@tiptap/react";
 import { calculateCycle, refineCycleMetrics, getPhaseName } from "@/lib/cycle";
+import { MOODS } from "@/lib/moods";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,19 +34,6 @@ const WRITING_PROMPTS = [
   "What thoughts or emotions are taking up the most space right now?",
   "Reflect on a gentle boundary you set (or wish to set) today.",
   "What is one thing you can do to treat your body with kindness today?",
-];
-
-const MOODS = [
-  { id: "serene", label: "Serene 🌸" },
-  { id: "energetic", label: "Energetic ⚡" },
-  { id: "sensitive", label: "Sensitive 🥺" },
-  { id: "fatigued", label: "Fatigued 😴" },
-  { id: "reflective", label: "Reflective 🧘" },
-  { id: "anxious", label: "Anxious 😰" },
-  { id: "down", label: "Down 😔" },
-  { id: "happy", label: "Happy 😊" },
-  { id: "stressed", label: "Stressed 😫" },
-  { id: "irritable", label: "Irritable 😠" },
 ];
 
 export default function JournalView() {

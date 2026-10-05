@@ -114,7 +114,7 @@ Pure functions, no I/O, shared by calendar, journal stamps, dashboard, trends:
 
 ## Design system
 
-Glassmorphism primitives (`GlassCard`/`GlassPanel`/`GlassButton`) over
+Glassmorphism primitives (`GlassCard`/`GlassButton`) over
 semantic Tailwind v4 tokens (`sakura-deep #d56f96`, `plum #8a5a78`,
 `ink-text/ink-soft`, `surface-*`) defined in `globals.css`; Noto Serif JP +
 Quicksand; shared `pageVariants`/`itemVariants` in `lib/motion.ts`;

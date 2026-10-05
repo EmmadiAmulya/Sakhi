@@ -1,20 +1,16 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { db, requireUserId } from "./client";
 import { queryKeys } from "./keys";
 import { toast } from "@/lib/toast";
+import { todayStr } from "@/lib/date";
 import type { MoodLogRow } from "./database.types";
 
 export interface MoodLog {
   mood: string | null;
   energy: number | null;
   note: string | null;
-}
-
-export function todayStr(): string {
-  return format(new Date(), "yyyy-MM-dd");
 }
 
 export async function fetchMoodLog(date: string): Promise<MoodLog | null> {

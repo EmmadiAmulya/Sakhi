@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { db, requireUserId } from "./client";
 import { queryKeys } from "./keys";
 import { toast } from "@/lib/toast";
-import { todayStr } from "./mood-logs";
+import { todayStr } from "@/lib/date";
 import type { SupplementRow, SupplementLogRow } from "./database.types";
 
 export interface SupplementWithStatus {

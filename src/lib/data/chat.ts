@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { db } from "./client";
 import { queryKeys } from "./keys";
+import type { Persona } from "./database.types";
 
 export interface HistoryMessage {
   role: "user" | "assistant";
@@ -11,7 +12,7 @@ export interface HistoryMessage {
 }
 
 /** Messages from the user's most recent session with this persona (oldest first). */
-export function useChatHistory(persona: "sakhi" | "maya") {
+export function useChatHistory(persona: Persona) {
   return useQuery({
     queryKey: queryKeys.chatSessions(persona),
     queryFn: async (): Promise<HistoryMessage[]> => {
