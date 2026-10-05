@@ -168,17 +168,19 @@ export async function importUserDataExport(
     if (typeof h.id === "string" && typeof h.name === "string") habitIdToName.set(h.id, h.name);
   }
 
-  let habitNameToNewId = new Map<string, string>();
-  const { data: upsertedHabits, error: habitsErr } = await db()
-    .from("habits")
-    .upsert(exportedHabits.map(own), { onConflict: "user_id,name" })
-    .select("id,name");
-  if (habitsErr) {
-    errors.push(`habits: ${habitsErr.message}`);
-  } else {
-    imported.push("habits");
-    for (const h of (upsertedHabits ?? []) as { id: string; name: string }[]) {
-      if (!habitNameToNewId.has(h.name)) habitNameToNewId.set(h.name, h.id);
+  const habitNameToNewId = new Map<string, string>();
+  if (exportedHabits.length > 0) {
+    const { data: upsertedHabits, error: habitsErr } = await db()
+      .from("habits")
+      .upsert(exportedHabits.map(own), { onConflict: "user_id,name" })
+      .select("id,name");
+    if (habitsErr) {
+      errors.push(`habits: ${habitsErr.message}`);
+    } else {
+      imported.push("habits");
+      for (const h of (upsertedHabits ?? []) as { id: string; name: string }[]) {
+        if (!habitNameToNewId.has(h.name)) habitNameToNewId.set(h.name, h.id);
+      }
     }
   }
 
@@ -197,15 +199,18 @@ export async function importUserDataExport(
   else if (remappedHabitLogs.length > 0) imported.push("habit_logs");
 
   const exportedSupplements = raw.supplements as Record<string, unknown>[];
-  const { data: upsertedSupplements, error: supplementsErr } = await db()
-    .from("supplements")
-    .upsert(exportedSupplements.map(own), { onConflict: "id" })
-    .select("id");
-  if (supplementsErr) errors.push(`supplements: ${supplementsErr.message}`);
-  else if (exportedSupplements.length > 0) imported.push("supplements");
-  const validSupplementIds = new Set(
-    ((upsertedSupplements ?? []) as { id: string }[]).map((s) => s.id)
-  );
+  let validSupplementIds = new Set<string>();
+  if (exportedSupplements.length > 0) {
+    const { data: upsertedSupplements, error: supplementsErr } = await db()
+      .from("supplements")
+      .upsert(exportedSupplements.map(own), { onConflict: "id" })
+      .select("id");
+    if (supplementsErr) errors.push(`supplements: ${supplementsErr.message}`);
+    else {
+      imported.push("supplements");
+      validSupplementIds = new Set(((upsertedSupplements ?? []) as { id: string }[]).map((s) => s.id));
+    }
+  }
 
   const supplementLogs = raw.supplement_logs as Record<string, unknown>[];
   const remappedSupplementLogs: Record<string, unknown>[] = [];
@@ -238,13 +243,18 @@ export async function importUserDataExport(
   }
 
   const exportedSessions = raw.chat_sessions as Record<string, unknown>[];
-  const { data: upsertedSessions, error: sessionsErr } = await db()
-    .from("chat_sessions")
-    .upsert(exportedSessions.map(own), { onConflict: "id" })
-    .select("id");
-  if (sessionsErr) errors.push(`chat_sessions: ${sessionsErr.message}`);
-  else if (exportedSessions.length > 0) imported.push("chat_sessions");
-  const validSessionIds = new Set(((upsertedSessions ?? []) as { id: string }[]).map((s) => s.id));
+  let validSessionIds = new Set<string>();
+  if (exportedSessions.length > 0) {
+    const { data: upsertedSessions, error: sessionsErr } = await db()
+      .from("chat_sessions")
+      .upsert(exportedSessions.map(own), { onConflict: "id" })
+      .select("id");
+    if (sessionsErr) errors.push(`chat_sessions: ${sessionsErr.message}`);
+    else {
+      imported.push("chat_sessions");
+      validSessionIds = new Set(((upsertedSessions ?? []) as { id: string }[]).map((s) => s.id));
+    }
+  }
 
   const messages = raw.chat_messages as Record<string, unknown>[];
   const remappedMessages: Record<string, unknown>[] = [];

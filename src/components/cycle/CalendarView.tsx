@@ -145,9 +145,13 @@ export default function CalendarView() {
               }}
               modifiers={{
                 loggedPeriod: loggedPeriodDays,
-                predictedPeriod: predictedPeriodDays,
-                fertile: fertileDays,
-                ovulation: ovulationDays,
+                ...(hasCycleData
+                  ? {
+                      predictedPeriod: predictedPeriodDays,
+                      fertile: fertileDays,
+                      ovulation: ovulationDays,
+                    }
+                  : {}),
                 hasDot: loggedDotDays,
               }}
               modifiersClassNames={{
@@ -168,6 +172,8 @@ export default function CalendarView() {
                 <span className="w-3.5 h-3.5 rounded bg-[#d56f96]/35 border border-[#d56f96]/40 shadow-inner flex-shrink-0" />
                 <span>Logged Period</span>
               </div>
+              {hasCycleData && (
+                <>
               <div className="flex items-center gap-2">
                 <span className="w-3.5 h-3.5 rounded border border-dashed border-[#d56f96]/50 bg-[#d56f96]/10 flex-shrink-0" />
                 <span>Predicted Period</span>
@@ -180,6 +186,8 @@ export default function CalendarView() {
                 <span className="w-3.5 h-3.5 rounded bg-[#8a5a78]/30 border border-[#8a5a78]/50 flex-shrink-0" />
                 <span>Est. Ovulation</span>
               </div>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-3 pt-1 border-t border-border/10 justify-center">
               <div className="flex items-center gap-1">
@@ -200,7 +208,7 @@ export default function CalendarView() {
         </GlassCard>
 
         {/* Phase Insight Card */}
-        <PhaseInsightCard phaseId={currentPhase.id} />
+        {hasCycleData && <PhaseInsightCard phaseId={currentPhase.id} />}
 
       </div>
 

@@ -109,10 +109,18 @@ export const useProfileStore = create<ProfileState>()(
         })),
 
       login: (email) =>
-        set({
-          isLoggedIn: true,
-          email,
-        }),
+        set((state) =>
+          state.email !== email
+            ? {
+                isLoggedIn: true,
+                email,
+                profile: initialProfile,
+                isOnboarded: false,
+                cycleLogs: {},
+                journalEntries: [],
+              }
+            : { isLoggedIn: true, email }
+        ),
 
       logout: () =>
         set({
@@ -177,6 +185,14 @@ export const useProfileStore = create<ProfileState>()(
     }),
     {
       name: "sakhi-profile-store",
+      version: 1,
+      partialize: (state) => ({ reminders: state.reminders }),
+      migrate: (persisted, version) => {
+        // Older versions persisted profile/cycleLogs/journalEntries (health
+        // data) and could flash the previous user's cache — drop them.
+        if (version < 1) return { reminders: initialReminders };
+        return persisted as { reminders: ReminderPreferences };
+      },
     }
   )
 );

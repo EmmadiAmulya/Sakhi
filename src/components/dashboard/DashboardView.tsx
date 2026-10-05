@@ -24,8 +24,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
   // Dev-only mock seed (no-op unless NEXT_PUBLIC_ENABLE_DEV_SEED=true)
   useDevSeed();
 
-  // Supplements + mood + water persist to Supabase. Sleep is display-only
-  // (no input UI yet) so it stays a constant.
+  // Supplements + mood + water + sleep persist to Supabase.
   const { data: supplements = [] } = useSupplementsToday();
   const toggleSupp = useToggleSupplement();
   const { data: todayMood } = useTodayMoodLog();
