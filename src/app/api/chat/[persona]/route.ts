@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 // ponytail: single fixed model; swap via env if we ever need per-persona models.
 const NIM_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-const MODEL = process.env.NVIDIA_NIM_MODEL ?? "nvidia/llama-3.3-nemotron-super-49b-v1.5";
+const MODEL = process.env.NVIDIA_NIM_MODEL ?? "deepseek-ai/deepseek-v4-flash-0731";
 const MAX_MESSAGES = 40;
 const MAX_CHARS_PER_MESSAGE = 8000;
 
@@ -123,10 +123,10 @@ export async function POST(
     );
   }
 
+  const lastUser = [...messages].reverse().find((m) => m.role === "user");
   let sessionId: string;
   try {
     sessionId = await findOrCreateSession(supabase, userId, persona);
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
     if (lastUser) {
       await supabase.from("chat_messages").insert({
         session_id: sessionId,
@@ -141,8 +141,11 @@ export async function POST(
   }
 
   let systemPrompt = config.systemPrompt;
+  const EMERGENCY_REGEX =
+    /\b(suicid|kill\s+(myself|me)|end\s+my\s+life|hurt\s+myself|self[- ]harm|overdose|want\s+to\s+die|severe\s+bleeding|chest\s+pain|cannot\s+breathe|can'?t\s+breathe|unconscious|poisoning|emergency\s+helpline|crisis\s+line)\b/i;
+  const isEmergency = EMERGENCY_REGEX.test(lastUser?.content ?? "");
+
   if (persona === "maya") {
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const context = await retrieveContext(supabase, apiKey, lastUser?.content ?? "");
     // Only ground the reply when retrieval actually found something relevant.
     if (context) {
@@ -157,7 +160,7 @@ export async function POST(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        Accept: "application/json",
+        Accept: "text/event-stream",
       },
       body: JSON.stringify({
         model: MODEL,
@@ -168,35 +171,109 @@ export async function POST(
         temperature: 0.6,
         top_p: 0.95,
         max_tokens: 2048,
+        stream: true,
       }),
     });
   } catch {
     return NextResponse.json({ error: "Could not reach the AI service." }, { status: 502 });
   }
 
-  if (!nimRes.ok) {
+  if (!nimRes.ok || !nimRes.body) {
     const detail = await nimRes.text().catch(() => "");
     console.error(`[chat] NIM ${nimRes.status}:`, detail.slice(0, 500));
     return NextResponse.json({ error: "The AI service returned an error." }, { status: 502 });
   }
 
-  const completion = await nimRes.json().catch(() => null);
-  const reply: string | undefined = completion?.choices?.[0]?.message?.content?.trim();
-  if (!reply) {
-    return NextResponse.json({ error: "Empty reply from AI service." }, { status: 502 });
-  }
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  let accumulatedReply = "";
 
-  try {
-    await supabase.from("chat_messages").insert({
-      session_id: sessionId,
-      user_id: userId,
-      role: "assistant",
-      content: reply,
-    });
-  } catch (err) {
-    // Reply already generated; log and still return it rather than losing it.
-    console.error("[chat] failed to persist assistant reply:", err);
-  }
+  const stream = new ReadableStream({
+    async start(controller) {
+      // 1. Emit metadata event (including emergency status)
+      controller.enqueue(
+        encoder.encode(`event: meta\ndata: ${JSON.stringify({ isEmergency })}\n\n`)
+      );
 
-  return NextResponse.json({ reply });
+      const reader = nimRes.body!.getReader();
+      let buffer = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data:")) continue;
+
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(dataStr);
+              const delta = parsed?.choices?.[0]?.delta?.content;
+              if (delta) {
+                accumulatedReply += delta;
+                controller.enqueue(
+                  encoder.encode(`event: delta\ndata: ${JSON.stringify({ text: delta })}\n\n`)
+                );
+              }
+            } catch {
+              // Ignore partial JSON chunks
+            }
+          }
+        }
+
+        if (buffer.trim().startsWith("data:")) {
+          const dataStr = buffer.trim().slice(5).trim();
+          if (dataStr !== "[DONE]") {
+            try {
+              const parsed = JSON.parse(dataStr);
+              const delta = parsed?.choices?.[0]?.delta?.content;
+              if (delta) {
+                accumulatedReply += delta;
+                controller.enqueue(
+                  encoder.encode(`event: delta\ndata: ${JSON.stringify({ text: delta })}\n\n`)
+                );
+              }
+            } catch {
+              // Ignore
+            }
+          }
+        }
+
+        controller.enqueue(encoder.encode("event: done\ndata: {}\n\n"));
+      } catch (streamErr) {
+        console.error("[chat] streaming error:", streamErr);
+      } finally {
+        controller.close();
+        const finalReply = accumulatedReply.trim();
+        if (finalReply) {
+          try {
+            await supabase.from("chat_messages").insert({
+              session_id: sessionId,
+              user_id: userId,
+              role: "assistant",
+              content: finalReply,
+            });
+          } catch (persistErr) {
+            console.error("[chat] failed to persist assistant reply:", persistErr);
+          }
+        }
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
 }

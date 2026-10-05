@@ -8,6 +8,7 @@ import { useProfileStore, getCurrentCycleDay, getCyclePhase } from "@/lib/store/
 import { useSupplementsToday, useToggleSupplement } from "@/lib/data/supplements";
 import { useTodayMoodLog, useUpsertMoodLog } from "@/lib/data/mood-logs";
 import { useHabitValue, useSetHabitValue } from "@/lib/data/habits";
+import { useAddJournalEntry } from "@/lib/data/journal";
 import { useDevSeed } from "@/lib/data/dev-seed";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
@@ -28,6 +29,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
   const toggleSupp = useToggleSupplement();
   const { data: todayMood } = useTodayMoodLog();
   const upsertMood = useUpsertMoodLog();
+  const addJournalEntry = useAddJournalEntry();
 
   const SLEEP_HOURS = 7.5;
   const SLEEP_TARGET = 8;
@@ -61,12 +63,36 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
 
   const handleSaveNote = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!journalNote.trim()) return;
-    setNoteSaved(true);
-    setTimeout(() => {
-      setNoteSaved(false);
-      setJournalNote("");
-    }, 2000);
+    const note = journalNote.trim();
+    if (!note || addJournalEntry.isPending) return;
+
+    addJournalEntry.mutate(
+      {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        contentJSON: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: note }],
+            },
+          ],
+        },
+        contentText: note,
+        mood: activeMood,
+        cyclePhase: phase.id,
+      },
+      {
+        onSuccess: () => {
+          setNoteSaved(true);
+          setJournalNote("");
+          setTimeout(() => {
+            setNoteSaved(false);
+          }, 2500);
+        },
+      }
+    );
   };
 
   const waterProgress = (waterValue / WATER_TARGET) * 100;
@@ -304,9 +330,9 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
               variant={noteSaved ? "primary" : "secondary"} 
               type="submit" 
               className="py-2.5 text-xs font-semibold w-full transition-all"
-              disabled={!journalNote.trim()}
+              disabled={!journalNote.trim() || addJournalEntry.isPending}
             >
-              {noteSaved ? "Note Logged ✓" : "Save Daily Note"}
+              {addJournalEntry.isPending ? "Saving..." : noteSaved ? "Note Logged ✓" : "Save Daily Note"}
             </GlassButton>
           </form>
         </BentoCard>

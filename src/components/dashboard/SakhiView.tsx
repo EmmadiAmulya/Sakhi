@@ -85,21 +85,72 @@ export default function SakhiView({ setActiveTab }: SakhiViewProps) {
     setInputVal("");
     setIsTyping(true);
 
+    const botMsgId = `sakhi-${Date.now()}`;
+
     try {
       const res = await fetch(`/api/chat/sakhi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: view
-            .filter(m => m.sender === "user" || (!m.isSuggestion && m.timestamp))
-            .map(m => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
+          messages: [
+            ...view
+              .filter((m) => m.sender === "user" || (!m.isSuggestion && m.timestamp))
+              .map((m) => ({ role: m.sender === "user" ? ("user" as const) : ("assistant" as const), content: m.text })),
+            { role: "user" as const, content: text },
+          ],
         }),
       });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.reply) {
-        appendBot(data.reply);
-      } else {
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
         appendBot(data?.error ?? `Sorry ${displayName}, I couldn't respond just now. Please try again in a moment.`);
+        return;
+      }
+
+      if (!res.body) {
+        appendBot(`Sorry ${displayName}, empty response from server.`);
+        return;
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: botMsgId,
+          sender: "bot",
+          text: "",
+          timestamp: now(),
+        },
+      ]);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const dataStr = trimmed.slice(5).trim();
+          if (!dataStr || dataStr === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (parsed.text) {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === botMsgId ? { ...m, text: m.text + parsed.text } : m))
+              );
+            }
+          } catch {
+            // Ignore partial SSE chunks
+          }
+        }
       }
     } catch {
       appendBot(`Sorry ${displayName}, I couldn't reach the server. Please check your connection and try again.`);
