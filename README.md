@@ -7,7 +7,7 @@ A privacy-first, sakura-themed PWA for cycle tracking, journaling, mood/habit lo
 
 ## Stack
 
-Next.js 16 (App Router) · React 19 · Tailwind v4 · Supabase (auth + Postgres + RLS + pgvector) · NVIDIA NIM (`llama-3.3-nemotron-super-49b-v1.5`) · TanStack Query · Framer Motion
+Next.js 16 (App Router) · React 19 · Tailwind v4 · Supabase (auth + Postgres + RLS + pgvector) · NVIDIA NIM (`moonshotai/kimi-k3`) · TanStack Query · Framer Motion
 
 ## Architecture
 

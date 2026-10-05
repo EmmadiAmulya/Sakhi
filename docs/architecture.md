@@ -71,8 +71,8 @@ Mutations: optimistic store update → Supabase → rollback + toast on error
    persist the newest user message.
 5. Call NIM's OpenAI-compatible endpoint with the persona's `systemPrompt`
    from `lib/personas.ts` (+ RAG context for Maya, below). Model defaults to
-   `nvidia/llama-3.3-nemotron-super-49b-v1.5`, overridable via
-   `NVIDIA_NIM_MODEL`. `max_tokens: 2048` (1024 truncated Maya's grounded answers).
+   `moonshotai/kimi-k3`, overridable via
+   `NVIDIA_NIM_MODEL`. `max_tokens: 2048` (2048 was briefly truncating Maya's grounded answers).
 6. Persist the assistant reply; return `{reply}`. A failed reply-save still
    returns the text rather than losing it.
 

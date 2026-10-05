@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 // ponytail: single fixed model; swap via env if we ever need per-persona models.
 const NIM_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-const MODEL = process.env.NVIDIA_NIM_MODEL ?? "deepseek-ai/deepseek-v4-flash-0731";
+const MODEL = process.env.NVIDIA_NIM_MODEL ?? "moonshotai/kimi-k3";
 const MAX_MESSAGES = 40;
 const MAX_CHARS_PER_MESSAGE = 8000;
 
@@ -168,9 +168,10 @@ export async function POST(
           { role: "system", content: systemPrompt },
           ...messages.slice(-MAX_MESSAGES),
         ],
-        temperature: 0.6,
-        top_p: 0.95,
-        max_tokens: 2048,
+        temperature: 0.8,
+        seed: 0,
+        max_tokens: 16384,
+        reasoning_effort: "max",
         stream: true,
       }),
     });
