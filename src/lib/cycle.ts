@@ -31,6 +31,18 @@ export interface CalculatedCycle {
   isPeriodDay: boolean;
 }
 
+// Display names for the stable phase ids stored in `journal_entries.cycle_phase`.
+export const PHASE_NAMES: Record<CyclePhase["id"], string> = {
+  menstrual: "Menstrual Phase",
+  follicular: "Follicular Phase",
+  ovulatory: "Ovulatory Phase",
+  luteal: "Luteal Phase",
+};
+
+/** Display name for a stored phase id; falls back to the raw value (legacy rows/""). */
+export const getPhaseName = (id: string): string =>
+  PHASE_NAMES[id as CyclePhase["id"]] ?? id;
+
 // Proportional phase calculations based on refined cycle parameters
 export const getCyclePhaseForDay = (
   day: number,
@@ -42,7 +54,7 @@ export const getCyclePhaseForDay = (
   if (day <= periodLength) {
     return {
       id: "menstrual",
-      name: "Menstrual Phase",
+      name: PHASE_NAMES.menstrual,
       description: "Your body sheds the uterine lining. Rest and gentle stretches are key.",
       startDay: 1,
       endDay: periodLength,
@@ -51,7 +63,7 @@ export const getCyclePhaseForDay = (
   } else if (day < ovulationDay - 1) {
     return {
       id: "follicular",
-      name: "Follicular Phase",
+      name: PHASE_NAMES.follicular,
       description: "Estrogen rises, boosting physical energy, focus, and social engagement.",
       startDay: periodLength + 1,
       endDay: ovulationDay - 2,
@@ -60,7 +72,7 @@ export const getCyclePhaseForDay = (
   } else if (day <= ovulationDay + 1) {
     return {
       id: "ovulatory",
-      name: "Ovulatory Phase",
+      name: PHASE_NAMES.ovulatory,
       description: "Estrogen peaks and LH surge triggers ovulation. High energy and libido.",
       startDay: ovulationDay - 1,
       endDay: ovulationDay + 1,
@@ -69,7 +81,7 @@ export const getCyclePhaseForDay = (
   } else {
     return {
       id: "luteal",
-      name: "Luteal Phase",
+      name: PHASE_NAMES.luteal,
       description: "Progesterone dominates, winding down energy. Prioritize warm, grounding meals.",
       startDay: ovulationDay + 2,
       endDay: cycleLength,

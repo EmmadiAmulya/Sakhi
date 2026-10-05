@@ -93,7 +93,7 @@ export const mockJournalEntries = [
     },
     contentText: "Reflecting on Energy Shift\nAs I enter my luteal phase, I can feel a distinct shift in my physical drive. Yesterday, I wanted to jump on HIIT workouts, but today my body is calling for stretching and cozy tea. Giving myself full permission to rest.",
     mood: "reflective",
-    cyclePhase: "Luteal Phase",
+    cyclePhase: "luteal",
   },
   {
     id: "entry-mock-2",
@@ -119,6 +119,6 @@ export const mockJournalEntries = [
     },
     contentText: "Creativity Boost\nEstrogen is rising! Handled all design alignments and spent two hours brainstorming with the developer. The ideas felt flowy and clear. Definitely matching my follicular energy curve.",
     mood: "energetic",
-    cyclePhase: "Follicular Phase",
+    cyclePhase: "follicular",
   },
 ];

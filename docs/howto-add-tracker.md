@@ -6,7 +6,7 @@ migration → types → data hooks → dashboard UI. Assumes familiarity with th
 
 ## Prerequisites
 
-- `.env.local` filled in (see `.env.example`); migrations 0001–0003 applied.
+- `.env.local` filled in (see `.env.example`); migrations 0001–0004 applied.
 - Dev server running (`pnpm dev`).
 
 ## Steps

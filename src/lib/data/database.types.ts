@@ -73,6 +73,8 @@ export interface HabitLogRow {
   log_date: string;
   done: boolean | null;
   value: number | null; // 0003_habit_values.sql — quantitative metrics (ml, hours)
+  created_at: string; // 0004_db_integrity.sql
+  updated_at: string;
 }
 
 export interface SupplementRow {
@@ -90,6 +92,8 @@ export interface SupplementLogRow {
   supplement_id: string;
   log_date: string;
   taken: boolean | null;
+  created_at: string; // 0004_db_integrity.sql
+  updated_at: string;
 }
 
 export interface JournalEntryRow {
@@ -133,5 +137,5 @@ export interface DocumentChunkRow {
   id: string;
   document_id: string;
   content: string;
-  embedding: number[] | null;
+  embedding: string | null; // pgvector over PostgREST returns text: "[1,2,3]"
 }

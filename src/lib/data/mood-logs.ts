@@ -47,37 +47,20 @@ export function useUpsertMoodLog() {
   return useMutation({
     mutationFn: async (vars: Partial<MoodLog>) => {
       const userId = await requireUserId();
-      // mood_logs has no UNIQUE(user_id, log_date), so emulate upsert:
-      // find today's row, update it if present, otherwise insert.
-      const { data: existing, error: selErr } = await db()
+      // UNIQUE(user_id, log_date) (0004) → true upsert.
+      const { error } = await db()
         .from("mood_logs")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("log_date", date)
-        .maybeSingle();
-      if (selErr) throw new Error(selErr.message);
-
-      if (existing) {
-        const { error } = await db()
-          .from("mood_logs")
-          .update({
+        .upsert(
+          {
+            user_id: userId,
+            log_date: date,
             mood: vars.mood ?? null,
             energy: vars.energy ?? null,
             note: vars.note ?? null,
-          })
-          .eq("id", (existing as { id: string }).id)
-          .eq("user_id", userId);
-        if (error) throw new Error(error.message);
-      } else {
-        const { error } = await db().from("mood_logs").insert({
-          user_id: userId,
-          log_date: date,
-          mood: vars.mood ?? null,
-          energy: vars.energy ?? null,
-          note: vars.note ?? null,
-        });
-        if (error) throw new Error(error.message);
-      }
+          },
+          { onConflict: "user_id,log_date" }
+        );
+      if (error) throw new Error(error.message);
     },
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: key });

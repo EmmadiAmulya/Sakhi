@@ -11,7 +11,7 @@ import {
   useDeleteJournalEntry,
 } from "@/lib/data/journal";
 import type { JSONContent } from "@tiptap/react";
-import { calculateCycle, refineCycleMetrics } from "@/lib/cycle";
+import { calculateCycle, refineCycleMetrics, getPhaseName } from "@/lib/cycle";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
 import { motion, AnimatePresence } from "framer-motion";
@@ -76,7 +76,7 @@ export default function JournalView() {
     refinedPeriodLength,
     new Date()
   );
-  const currentPhaseName = currentCalc.phase.name;
+  const currentPhaseId = currentCalc.phase.id;
 
   const handleCreateNew = () => {
     setActiveEntryId("new");
@@ -91,7 +91,7 @@ export default function JournalView() {
       contentJSON,
       contentText,
       mood: selectedMood,
-      cyclePhase: currentPhaseName,
+      cyclePhase: currentPhaseId,
     });
     setActiveEntryId(null);
   };
@@ -137,7 +137,7 @@ export default function JournalView() {
                     {activeEntryId === "new" ? "New Reflection" : "Edit Reflection"}
                   </h3>
                   <p className="text-[10px] text-ink-soft">
-                    Stamped: <span className="font-semibold text-sakura-deep">{currentPhaseName}</span>
+                    Stamped: <span className="font-semibold text-sakura-deep">{getPhaseName(currentPhaseId)}</span>
                   </p>
                 </div>
               </div>
@@ -300,7 +300,7 @@ export default function JournalView() {
                                 </span>
                               )}
                               <span className="text-[9px] font-bold text-sakura-deep bg-sakura/10 px-2 py-0.5 rounded-full select-none">
-                                {entry.cyclePhase}
+                                {getPhaseName(entry.cyclePhase)}
                               </span>
                             </div>
                           </div>

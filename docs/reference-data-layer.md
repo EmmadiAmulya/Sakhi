@@ -42,7 +42,7 @@ Every module follows the same shape (copied from `mood-logs.ts`):
 | `todayStr()` | util | shared "today" for all daily modules |
 | `fetchMoodLog(date)` | query fn | `.maybeSingle()` → `MoodLog \| null` |
 | `useTodayMoodLog()` | hook | `[...moodLogs, today]`; `staleTime` 60s |
-| `useUpsertMoodLog()` | mutation | `Partial<MoodLog>`; emulates upsert via select-then-write (no unique constraint on `mood_logs`) |
+| `useUpsertMoodLog()` | mutation | `Partial<MoodLog>`; upsert on `(user_id, log_date)` (unique added in 0004) |
 
 ### habits.ts (quantitative: water ml, sleep hours)
 
@@ -121,6 +121,7 @@ chatSessions(persona), chatMessages(sessionId)
 - **0001** — `profiles` (id = auth user id, `onboarded` flag), `reminder_preferences`, `cycle_logs` (unique `(user_id, log_date)`), `mood_logs`, `habits` + `habit_logs` (unique `(habit_id, log_date)`), `supplements` + `supplement_logs` (unique `(supplement_id, log_date)`), `journal_entries`, `chat_sessions` + `chat_messages`. All RLS `auth.uid() = user_id`, full self-access.
 - **0002** — `documents`, `document_chunks` (`embedding vector(2048)`), authenticated-read-only RLS, `match_document_chunks(vector, count)` RPC returning `(id, content, similarity)`. No vector index (see architecture.md).
 - **0003** — `habit_logs.value numeric` for quantitative metrics.
+- **0004** — integrity: `mood_logs` unique `(user_id, log_date)`; `habit_logs`/`supplement_logs` gain `created_at`/`updated_at` + update triggers; lookup indexes; timestamp columns `NOT NULL`; `mood` constrained to the 10 UI ids and `cycle_phase` normalized from display names to ids (`menstrual`/`follicular`/`ovulatory`/`luteal`) then constrained. `journal_entries.cycle_phase` now stores the phase **id**; the UI maps it back via `getPhaseName()` (`lib/cycle.ts`).
 
 Hand-maintained TS mirrors live in `lib/data/database.types.ts` (regenerate
 via `supabase gen types` once the CLI is linked).
