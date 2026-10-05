@@ -13,8 +13,8 @@ Every module follows the same shape (copied from `mood-logs.ts`):
 - `use*` mutations — optimistic store/cache update → Supabase → rollback +
   `toast.error` on failure, `toast.success` on success, invalidate on settle.
 - Reads rely on RLS; mutations call `requireUserId()` (throws when signed out).
-- `todayStr()` (`mood-logs.ts`) returns local `yyyy-MM-dd` — the shared
-  day-boundary definition.
+- `todayStr()` / `formatClockTime()` (`lib/date.ts`) are the shared local
+  day-boundary and wall-clock helpers.
 
 ## Hooks by module
 
@@ -39,7 +39,6 @@ Every module follows the same shape (copied from `mood-logs.ts`):
 
 | Export | Kind | Notes |
 |---|---|---|
-| `todayStr()` | util | shared "today" for all daily modules |
 | `fetchMoodLog(date)` | query fn | `.maybeSingle()` → `MoodLog \| null` |
 | `useTodayMoodLog()` | hook | `[...moodLogs, today]`; `staleTime` 60s |
 | `useUpsertMoodLog()` | mutation | `Partial<MoodLog>`; upsert on `(user_id, log_date)` (unique added in 0004) |
@@ -49,7 +48,7 @@ Every module follows the same shape (copied from `mood-logs.ts`):
 | Export | Kind | Notes |
 |---|---|---|
 | `useHabitValue(name)` | hook | today's `habit_logs.value` for the named habit; `null` when unlogged |
-| `useSetHabitValue(name)` | mutation | `(value)`; auto-creates the `habits` row on first use (race-safe re-read); upserts on `(habit_id, log_date)`; sets `done = value > 0` |
+| `useSetHabitValue(name)` | mutation | `(value)`; auto-creates the `habits` row on first use (unique `(user_id, name)` in 0005; insert races re-read); upserts on `(habit_id, log_date)`; sets `done = value > 0` |
 
 Habit names in use: `"Water"`. Sleep is display-only (no setter wired).
 
@@ -81,7 +80,7 @@ Habit names in use: `"Water"`. Sleep is display-only (no setter wired).
 
 | Export | Kind | Notes |
 |---|---|---|
-| `useChatHistory("sakhi" \| "maya")` | hook | messages of the latest session, oldest-first; `[]` when signed out or on any failure; `staleTime: Infinity, gcTime: 0` (load once) |
+| `useChatHistory(persona)` | hook | messages of the latest session, oldest-first; `persona` is the shared `database.types.Persona`; `[]` when signed out or on any failure; `staleTime: Infinity, gcTime: 0` (load once). UI side: both personas render via `components/chat/PersonaChat.tsx` + `usePersonaChat` |
 
 ### dev-seed.ts
 
@@ -122,6 +121,7 @@ chatSessions(persona), chatMessages(sessionId)
 - **0002** — `documents`, `document_chunks` (`embedding vector(2048)`), authenticated-read-only RLS, `match_document_chunks(vector, count)` RPC returning `(id, content, similarity)`. No vector index (see architecture.md).
 - **0003** — `habit_logs.value numeric` for quantitative metrics.
 - **0004** — integrity: `mood_logs` unique `(user_id, log_date)`; `habit_logs`/`supplement_logs` gain `created_at`/`updated_at` + update triggers; lookup indexes; timestamp columns `NOT NULL`; `mood` constrained to the 10 UI ids and `cycle_phase` normalized from display names to ids (`menstrual`/`follicular`/`ovulatory`/`luteal`) then constrained. `journal_entries.cycle_phase` now stores the phase **id**; the UI maps it back via `getPhaseName()` (`lib/cycle.ts`).
+- **0005** — `habits` unique `(user_id, name)` (dedupes first, repointing/trimming `habit_logs`) — fixes PGRST116 from duplicate water/habit rows created by the old select-then-insert race.
 
 Hand-maintained TS mirrors live in `lib/data/database.types.ts` (regenerate
 via `supabase gen types` once the CLI is linked).

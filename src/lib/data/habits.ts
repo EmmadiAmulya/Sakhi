@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { todayStr } from "./mood-logs";
+import { todayStr } from "@/lib/date";
 import { db, requireUserId } from "./client";
 import { queryKeys } from "./keys";
 import { toast } from "@/lib/toast";
@@ -13,11 +13,15 @@ import { toast } from "@/lib/toast";
 
 async function getHabitId(name: string): Promise<string> {
   const userId = await requireUserId();
+  // limit(1) tolerates legacy duplicate habit rows (pre-0005); the unique
+  // constraint added there makes the race path below a real conflict.
   const { data: existing, error: selErr } = await db()
     .from("habits")
     .select("id")
     .eq("user_id", userId)
     .eq("name", name)
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle();
   if (selErr) throw new Error(selErr.message);
   if (existing) return (existing as { id: string }).id;
@@ -34,6 +38,8 @@ async function getHabitId(name: string): Promise<string> {
       .select("id")
       .eq("user_id", userId)
       .eq("name", name)
+      .order("created_at", { ascending: true })
+      .limit(1)
       .maybeSingle();
     if (retryErr || !retry) throw new Error(insErr.message);
     return (retry as { id: string }).id;
@@ -53,6 +59,7 @@ export function useHabitValue(name: string) {
         .eq("user_id", userId)
         .eq("log_date", date)
         .eq("habits.name", name)
+        .limit(1)
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) return null;

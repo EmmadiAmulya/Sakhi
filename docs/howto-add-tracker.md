@@ -6,7 +6,7 @@ migration → types → data hooks → dashboard UI. Assumes familiarity with th
 
 ## Prerequisites
 
-- `.env.local` filled in (see `.env.example`); migrations 0001–0004 applied.
+- `.env.local` filled in (see `.env.example`); migrations 0001–0005 applied.
 - Dev server running (`pnpm dev`).
 
 ## Steps
@@ -20,9 +20,9 @@ migration → types → data hooks → dashboard UI. Assumes familiarity with th
 
 3. **Write the data module** (`src/lib/data/<name>.ts`), copying
    `mood-logs.ts`: a `fetch*` function, a `use*` query hook keyed by
-   `todayStr()`, and an upsert mutation with optimistic update + rollback +
-   toast. For habit-backed numerics, copy `habits.ts` instead — it already
-   handles auto-creating the habit row.
+   `todayStr()` (from `lib/date.ts`), and an upsert mutation with optimistic
+   update + rollback + toast. For habit-backed numerics, copy `habits.ts`
+   instead — it already handles auto-creating the habit row.
 
 4. **Mirror any schema change in `database.types.ts`** by hand (same PR, same
    diff — the file has no codegen yet).
