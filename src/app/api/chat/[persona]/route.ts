@@ -171,7 +171,7 @@ export async function POST(
         temperature: 0.8,
         seed: 0,
         max_tokens: 16384,
-        reasoning_effort: "medium",
+        reasoning_effort: "low",
         stream: true,
       }),
     });
