@@ -70,11 +70,16 @@ Mutations: optimistic store update → Supabase → rollback + toast on error
 4. Find-or-create the user's latest `chat_sessions` row for the persona;
    persist the newest user message.
 5. Call NIM's OpenAI-compatible endpoint with the persona's `systemPrompt`
-   from `lib/personas.ts` (+ RAG context for Maya, below). Model defaults to
-   `moonshotai/kimi-k3`, overridable via
-   `NVIDIA_NIM_MODEL`. `max_tokens: 2048` (2048 was briefly truncating Maya's grounded answers).
-6. Persist the assistant reply; return `{reply}`. A failed reply-save still
-   returns the text rather than losing it.
+   from `lib/personas.ts` (+ RAG context for Maya, below). Model is per-persona
+   (`nvidia/nemotron-3-ultra-550b-a55b`), overridable via `NVIDIA_NIM_MODEL`,
+   with a one-shot retry on `NVIDIA_NIM_FALLBACK_MODEL` (default
+   `nvidia/nemotron-3-super-120b-a12b`) when NIM returns 5xx/overload.
+   `reasoning_effort` is per-persona (Sakhi `low`, Maya `high`) and
+   overridable via `NVIDIA_NIM_REASONING_EFFORT` (NIM accepts only
+   `low`/`high`/`max`).
+6. Stream the reply as SSE: `meta` (emergency flag), `thinking` (K3
+   `reasoning_content` tokens), `delta` (answer text), `error`, `done`.
+   Assistant replies are persisted once the stream ends; thinking is never stored.
 
 Both chat views replaced keyword-regex mock replies with this route. The
 system prompts carry the product's safety design: Sakhi validates emotion and

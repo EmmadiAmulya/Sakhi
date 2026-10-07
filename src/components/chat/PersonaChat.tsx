@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Send, User, Heart, Stethoscope, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Send, User, Heart, Stethoscope, AlertTriangle, ShieldCheck, Sparkles } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
 import { PERSONAS, type Persona } from "@/lib/personas";
@@ -27,6 +27,11 @@ export default function PersonaChat({ personaId, setActiveTab }: PersonaChatProp
     usePersonaChat(personaId);
   const AvatarIcon = AVATAR_ICONS[persona.avatarIcon];
   const other = PERSONAS[personaId === "sakhi" ? "maya" : "sakhi"];
+
+  // Show the typing dots only until the bot starts streaming (thinking counts as output).
+  const lastMessage = view[view.length - 1];
+  const awaitingFirstToken =
+    isTyping && (!lastMessage || lastMessage.sender === "user" || (!lastMessage.text && !lastMessage.thinking));
 
   return (
     <motion.div
@@ -136,6 +141,22 @@ export default function PersonaChat({ personaId, setActiveTab }: PersonaChatProp
                     >
                       <div className="whitespace-pre-line">{msg.text}</div>
 
+                      {/* Live reasoning stream (K3) — shown until the answer starts */}
+                      {!isUser && msg.thinking && !msg.text && (
+                        <div
+                          aria-live="polite"
+                          className="mb-2 max-h-40 overflow-hidden rounded-xl border border-border/60 bg-surface-glass/40 px-3 py-2 [mask-image:linear-gradient(to_bottom,black_65%,transparent)]"
+                        >
+                          <p className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-plum">
+                            <Sparkles className="h-3 w-3 animate-pulse" />
+                            Thinking…
+                          </p>
+                          <p className="mt-1 whitespace-pre-line text-[11px] italic leading-relaxed text-ink-soft">
+                            {msg.thinking}
+                          </p>
+                        </div>
+                      )}
+
                       {/* Safety Disclaimer on bot messages */}
                       {!isUser && persona.disclaimer && (
                         <div className="mt-3 pt-2 border-t border-border/30 flex items-start gap-1 text-[9px] font-medium text-ink-soft/90 italic leading-snug">
@@ -155,7 +176,7 @@ export default function PersonaChat({ personaId, setActiveTab }: PersonaChatProp
               );
             })}
 
-            {isTyping && (
+            {awaitingFirstToken && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

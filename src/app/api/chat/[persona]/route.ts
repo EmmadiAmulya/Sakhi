@@ -3,14 +3,29 @@ import { PERSONAS } from "@/lib/personas";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+// Reasoning models stream for a while; give the function room (Vercel-capped).
+export const maxDuration = 300;
 
-// ponytail: single fixed model; swap via env if we ever need per-persona models.
+// ponytail: per-persona model, global env override, one fallback for NIM 503s.
 const NIM_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-const MODEL = process.env.NVIDIA_NIM_MODEL ?? "moonshotai/kimi-k3";
+const MODEL_OVERRIDE = process.env.NVIDIA_NIM_MODEL;
+const FALLBACK_MODEL = process.env.NVIDIA_NIM_FALLBACK_MODEL ?? "nvidia/nemotron-3-super-120b-a12b";
 const MAX_MESSAGES = 40;
 const MAX_CHARS_PER_MESSAGE = 8000;
+const MAX_THINKING_CHARS = 32000;
+const MAX_TOKENS = 32768;
+// NIM reasoning models accept only low|high|max — "medium" is rejected (422).
+const VALID_EFFORTS = new Set(["low", "high", "max"]);
+const ENV_EFFORT = process.env.NVIDIA_NIM_REASONING_EFFORT;
+// Abort the upstream stream if it goes silent this long.
+const NIM_INACTIVITY_MS = 45_000;
+const EMBED_TIMEOUT_MS = 8_000;
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  reasoning_content?: string; // preserved thinking for multi-turn K3 conversations
+};
 
 const EMBED_URL = "https://integrate.api.nvidia.com/v1/embeddings";
 const EMBED_MODEL = "nvidia/nemotron-3-embed-1b";
@@ -26,6 +41,7 @@ async function retrieveContext(
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
       body: JSON.stringify({ input: [query], model: EMBED_MODEL, input_type: "query" }),
+      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const json = await res.json();
@@ -47,16 +63,25 @@ function validateMessages(input: unknown): ChatMessage[] | null {
   if (!Array.isArray(input) || input.length === 0 || input.length > MAX_MESSAGES) return null;
   const out: ChatMessage[] = [];
   for (const m of input) {
+    if (!m || typeof m !== "object") return null;
+    const role = (m as { role?: unknown }).role;
+    const content = (m as { content?: unknown }).content;
     if (
-      !m || typeof m !== "object" ||
-      (m as { role?: unknown }).role !== "user" && (m as { role?: unknown }).role !== "assistant" ||
-      typeof (m as { content?: unknown }).content !== "string" ||
-      !(m as { content: string }).content.trim() ||
-      (m as { content: string }).content.length > MAX_CHARS_PER_MESSAGE
+      (role !== "user" && role !== "assistant") ||
+      typeof content !== "string" ||
+      !content.trim() ||
+      content.length > MAX_CHARS_PER_MESSAGE
     ) {
       return null;
     }
-    out.push({ role: (m as { role: "user" | "assistant" }).role, content: (m as { content: string }).content });
+    const reasoning = (m as { reasoning_content?: unknown }).reasoning_content;
+    out.push({
+      role,
+      content,
+      ...(typeof reasoning === "string" && reasoning.trim()
+        ? { reasoning_content: reasoning.slice(0, MAX_THINKING_CHARS) }
+        : {}),
+    });
   }
   return out;
 }
@@ -153,36 +178,59 @@ export async function POST(
     }
   }
 
-  let nimRes: Response;
-  try {
-    nimRes = await fetch(NIM_URL, {
+  const reasoningEffort =
+    ENV_EFFORT && VALID_EFFORTS.has(ENV_EFFORT) ? ENV_EFFORT : config.reasoningEffort;
+  const primaryModel = MODEL_OVERRIDE ?? config.chatModel;
+
+  // Abort handle for the inactivity watchdog (shared with the stream reader).
+  const nimAbort = new AbortController();
+
+  const payload = {
+    messages: [{ role: "system", content: systemPrompt }, ...messages],
+    max_tokens: MAX_TOKENS,
+    temperature: 1,
+    seed: 0,
+    reasoning_effort: reasoningEffort,
+    stream: true,
+  };
+
+  const callNim = (model: string) =>
+    fetch(NIM_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages.slice(-MAX_MESSAGES),
-        ],
-        temperature: 0.8,
-        seed: 0,
-        max_tokens: 16384,
-        reasoning_effort: "low",
-        stream: true,
-      }),
+      body: JSON.stringify({ ...payload, model }),
+      signal: nimAbort.signal,
     });
-  } catch {
-    return NextResponse.json({ error: "Could not reach the AI service." }, { status: 502 });
+
+  // NIM instances occasionally 503 under load; retry once on the fallback model.
+  const tryModel = async (model: string): Promise<{ res: Response | null; detail: string }> => {
+    try {
+      const res = await callNim(model);
+      if (res.ok) return { res, detail: "" };
+      const detail = await res.text().catch(() => "");
+      console.error(`[chat] NIM ${res.status} on ${model}:`, detail.slice(0, 300));
+      return { res: null, detail };
+    } catch (err) {
+      console.error(`[chat] NIM request failed on ${model}:`, err);
+      return { res: null, detail: "" };
+    }
+  };
+
+  let { res: nimRes, detail: failureDetail } = await tryModel(primaryModel);
+  if (!nimRes && primaryModel !== FALLBACK_MODEL) {
+    ({ res: nimRes, detail: failureDetail } = await tryModel(FALLBACK_MODEL));
   }
 
-  if (!nimRes.ok || !nimRes.body) {
-    const detail = await nimRes.text().catch(() => "");
-    console.error(`[chat] NIM ${nimRes.status}:`, detail.slice(0, 500));
-    return NextResponse.json({ error: "The AI service returned an error." }, { status: 502 });
+  if (!nimRes || !nimRes.body) {
+    const detail = failureDetail ? ` ${failureDetail.slice(0, 300)}` : "";
+    return NextResponse.json(
+      { error: `The AI service returned an error.${detail}`.trim() },
+      { status: 502 }
+    );
   }
 
   const encoder = new TextEncoder();
@@ -191,67 +239,73 @@ export async function POST(
 
   const stream = new ReadableStream({
     async start(controller) {
+      const send = (event: string, data: unknown) =>
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+
       // 1. Emit metadata event (including emergency status)
-      controller.enqueue(
-        encoder.encode(`event: meta\ndata: ${JSON.stringify({ isEmergency })}\n\n`)
-      );
+      send("meta", { isEmergency });
 
       const reader = nimRes.body!.getReader();
       let buffer = "";
+      let sawOutput = false;
+
+      let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+      const armWatchdog = () => {
+        if (inactivityTimer) clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => nimAbort.abort(), NIM_INACTIVITY_MS);
+      };
+
+      const handleLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data:")) return;
+        const dataStr = trimmed.slice(5).trim();
+        if (!dataStr || dataStr === "[DONE]") return;
+        try {
+          const parsed = JSON.parse(dataStr);
+          const delta = parsed?.choices?.[0]?.delta as
+            | { content?: string | null; reasoning_content?: string | null }
+            | undefined;
+          const thinking = delta?.reasoning_content;
+          if (thinking) {
+            sawOutput = true;
+            send("thinking", { thinking });
+          }
+          const text = delta?.content;
+          if (text) {
+            sawOutput = true;
+            accumulatedReply += text;
+            send("delta", { text });
+          }
+        } catch {
+          // Ignore partial JSON chunks
+        }
+      };
 
       try {
+        armWatchdog();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          armWatchdog();
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || !trimmed.startsWith("data:")) continue;
-
-            const dataStr = trimmed.slice(5).trim();
-            if (dataStr === "[DONE]") continue;
-
-            try {
-              const parsed = JSON.parse(dataStr);
-              const delta = parsed?.choices?.[0]?.delta?.content;
-              if (delta) {
-                accumulatedReply += delta;
-                controller.enqueue(
-                  encoder.encode(`event: delta\ndata: ${JSON.stringify({ text: delta })}\n\n`)
-                );
-              }
-            } catch {
-              // Ignore partial JSON chunks
-            }
-          }
+          for (const line of lines) handleLine(line);
         }
+        if (buffer) handleLine(buffer);
 
-        if (buffer.trim().startsWith("data:")) {
-          const dataStr = buffer.trim().slice(5).trim();
-          if (dataStr !== "[DONE]") {
-            try {
-              const parsed = JSON.parse(dataStr);
-              const delta = parsed?.choices?.[0]?.delta?.content;
-              if (delta) {
-                accumulatedReply += delta;
-                controller.enqueue(
-                  encoder.encode(`event: delta\ndata: ${JSON.stringify({ text: delta })}\n\n`)
-                );
-              }
-            } catch {
-              // Ignore
-            }
-          }
-        }
-
-        controller.enqueue(encoder.encode("event: done\ndata: {}\n\n"));
+        if (!sawOutput) send("error", { error: "The AI service returned no output." });
+        send("done", {});
       } catch (streamErr) {
         console.error("[chat] streaming error:", streamErr);
+        send("error", {
+          error: nimAbort.signal.aborted
+            ? "The AI service stopped responding. Please try again."
+            : "The AI reply was interrupted. Please try again.",
+        });
       } finally {
+        if (inactivityTimer) clearTimeout(inactivityTimer);
         controller.close();
         const finalReply = accumulatedReply.trim();
         if (finalReply) {

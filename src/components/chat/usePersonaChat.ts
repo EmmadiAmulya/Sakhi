@@ -11,12 +11,23 @@ export interface ChatUIMessage {
   sender: "user" | "bot";
   text: string;
   timestamp: string;
+  thinking?: string;
   isEmergency?: boolean;
 }
 
+/** Wire format for the route; assistant turns carry preserved reasoning for K3. */
+type OutgoingMessage = {
+  role: "user" | "assistant";
+  content: string;
+  reasoning_content?: string;
+};
+
+// Backstop if the SSE stream stops yielding bytes (the route has its own watchdog).
+const STREAM_INACTIVITY_MS = 90_000;
+
 /**
  * Shared chat state for both personas: saved history + this session's messages,
- * the SSE send/stream flow, and scrolling. Persona only changes the config.
+ * the SSE send/stream flow (including K3 thinking tokens), and scrolling.
  */
 export function usePersonaChat(personaId: Persona["id"]) {
   const profile = useProfileStore((state) => state.profile);
@@ -81,22 +92,36 @@ export function usePersonaChat(personaId: Persona["id"]) {
 
     const botMsgId = `${personaId}-${Date.now()}`;
     let isEmergencyTriggered = false;
+    let streamError: string | null = null;
+
+    const abort = new AbortController();
+    let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+    const armWatchdog = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => abort.abort(), STREAM_INACTIVITY_MS);
+    };
 
     try {
+      const history_ = view
+        .filter((m) => m.sender === "user" || (m.timestamp && !m.isEmergency))
+        .map((m): OutgoingMessage =>
+          m.sender === "user"
+            ? { role: "user", content: m.text }
+            : {
+                role: "assistant",
+                content: m.text,
+                ...(m.thinking ? { reasoning_content: m.thinking } : {}),
+              }
+        );
+
+      armWatchdog();
       const res = await fetch(`/api/chat/${personaId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [
-            ...view
-              .filter((m) => m.sender === "user" || (m.timestamp && !m.isEmergency))
-              .map((m) => ({
-                role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
-                content: m.text,
-              })),
-            { role: "user" as const, content: text },
-          ],
+          messages: [...history_, { role: "user" as const, content: text }],
         }),
+        signal: abort.signal,
       });
 
       if (!res.ok) {
@@ -122,6 +147,7 @@ export function usePersonaChat(personaId: Persona["id"]) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        armWatchdog();
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -136,9 +162,19 @@ export function usePersonaChat(personaId: Persona["id"]) {
           try {
             const parsed = JSON.parse(dataStr);
             if (parsed.isEmergency) isEmergencyTriggered = true;
-            if (parsed.text) {
+            if (parsed.error) streamError = String(parsed.error);
+            if (parsed.thinking) {
+              const chunk = String(parsed.thinking);
               setMessages((prev) =>
-                prev.map((m) => (m.id === botMsgId ? { ...m, text: m.text + parsed.text } : m))
+                prev.map((m) =>
+                  m.id === botMsgId ? { ...m, thinking: (m.thinking ?? "") + chunk } : m
+                )
+              );
+            }
+            if (parsed.text) {
+              const chunk = String(parsed.text);
+              setMessages((prev) =>
+                prev.map((m) => (m.id === botMsgId ? { ...m, text: m.text + chunk } : m))
               );
             }
           } catch {
@@ -147,10 +183,24 @@ export function usePersonaChat(personaId: Persona["id"]) {
         }
       }
 
-      if (isEmergencyTriggered) appendBot("Emergency Helpline Directory", true);
+      if (streamError) {
+        // Drop the empty placeholder when there's nothing to show, then surface the error.
+        setMessages((prev) => {
+          const bot = prev.find((m) => m.id === botMsgId);
+          return bot && !bot.text && !bot.thinking ? prev.filter((m) => m.id !== botMsgId) : prev;
+        });
+        appendBot(streamError);
+      } else if (isEmergencyTriggered) {
+        appendBot("Emergency Helpline Directory", true);
+      }
     } catch {
-      appendBot(`Sorry ${displayName}, I couldn't reach the server. Please check your connection and try again.`);
+      appendBot(
+        abort.signal.aborted
+          ? `Sorry ${displayName}, that took too long. Please try again.`
+          : `Sorry ${displayName}, I couldn't reach the server. Please check your connection and try again.`
+      );
     } finally {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
       setIsTyping(false);
     }
   };

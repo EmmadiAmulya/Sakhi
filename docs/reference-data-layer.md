@@ -143,7 +143,9 @@ via `supabase gen types` once the CLI is linked).
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client | RLS-scoped data access |
 | `SUPABASE_SERVICE_ROLE_KEY` | server only | health probes, ingestion (bypasses RLS) |
 | `NVIDIA_NIM_API_KEY` | server only | chat + embeddings |
-| `NVIDIA_NIM_MODEL` | server only | optional chat model override (default `moonshotai/kimi-k3`) |
+| `NVIDIA_NIM_MODEL` | server only | global chat model override (per-persona default `nvidia/nemotron-3-ultra-550b-a55b` in `lib/personas.ts`) |
+| `NVIDIA_NIM_FALLBACK_MODEL` | server only | retried once when the primary NIM call fails (default `nvidia/nemotron-3-super-120b-a12b`) |
+| `NVIDIA_NIM_REASONING_EFFORT` | server only | optional `low`/`high`/`max` override (defaults: Sakhi `low`, Maya `high`; `medium` is rejected by NIM) |
 | `NEXT_PUBLIC_ENABLE_DEV_SEED` | client | `"true"` enables mock seeding for new users |
 
 Template: `.env.example`. Never commit `.env.local`.

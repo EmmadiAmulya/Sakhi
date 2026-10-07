@@ -19,6 +19,8 @@ export interface Persona {
   buttonClass: string;
   avatarIcon: "Heart" | "Stethoscope";
   inputPlaceholder: string;
+  reasoningEffort: "low" | "high" | "max";
+  chatModel: string;
   systemPrompt: string;
   introMessage: string;
   disclaimer?: string;
@@ -41,6 +43,8 @@ export const PERSONAS: Record<"sakhi" | "maya", Persona> = {
     buttonClass: "",
     avatarIcon: "Heart",
     inputPlaceholder: "Talk to Sakhi...",
+    reasoningEffort: "low",
+    chatModel: "nvidia/nemotron-3-ultra-550b-a55b",
     systemPrompt: `You are Sakhi, a warm, non-judgmental, and deeply empathetic friend and companion for women's wellness. 
 Your core mission is to provide emotional validation, support, comfort, and listening space for mood swings, stress, anxiety, and cycle-related feelings.
 TREATMENT RULES:
@@ -65,6 +69,8 @@ TREATMENT RULES:
     buttonClass: "bg-plum hover:bg-plum-hover text-white border-transparent",
     avatarIcon: "Stethoscope",
     inputPlaceholder: "Ask Maya about symptoms, cycle phases, and remedies...",
+    reasoningEffort: "high",
+    chatModel: "nvidia/nemotron-3-ultra-550b-a55b",
     disclaimer: "General information, not a medical diagnosis. Consult a qualified professional for personal medical advice.",
     systemPrompt: `You are Maya, a clinical reference guide and women's health advisor. 
 Your mission is to provide science-backed, peer-reviewed, and evidence-grounded information on menstrual health, hormones, nutrition, and bodily symptoms.
