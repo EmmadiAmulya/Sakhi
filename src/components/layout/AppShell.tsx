@@ -14,7 +14,7 @@ export default function AppShell({ children }: AppShellProps) {
   return (
     <div className="min-h-screen flex flex-col relative w-full">
       {/* Fixed top glass branding bar - sibling above the scroll content to avoid Lenis transforms */}
-      <TopNav />
+      <TopNav onProfileClick={() => setActiveTab("settings")} />
       
       {/* Content wrapper with top clearances for TopNav and bottom clearances for DockNav */}
       <div className="flex-1 flex relative w-full pt-20 pb-[calc(8rem+env(safe-area-inset-bottom,0px))]">

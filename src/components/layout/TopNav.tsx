@@ -5,7 +5,7 @@ import { Heart, Bell } from "lucide-react";
 import GlassButton from "@/components/ui/GlassButton";
 import { useProfileStore, getCurrentCycleDay, getCyclePhase } from "@/lib/store/profile";
 
-export default function TopNav() {
+export default function TopNav({ onProfileClick }: { onProfileClick?: () => void }) {
   const profile = useProfileStore((state) => state.profile);
   const reminders = useProfileStore((state) => state.reminders);
   const [open, setOpen] = useState(false);
@@ -68,7 +68,7 @@ export default function TopNav() {
               {showBadge && <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-sakura-deep" />}
             </GlassButton>
             {open && (
-              <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-2xl border border-border/70 bg-surface-glass/90 backdrop-blur-md shadow-lg p-4 text-left">
+              <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-2xl border border-sakura-deep/25 bg-[#f8eaf1] p-4 text-left shadow-glass">
                 {!hasCycleData ? (
                   <p className="text-xs text-ink-soft">
                     Add your last period date in Settings to get cycle alerts.
@@ -91,7 +91,12 @@ export default function TopNav() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 pl-2">
+          <button
+            type="button"
+            onClick={onProfileClick}
+            aria-label="Open profile settings"
+            className="flex items-center gap-2 pl-2 rounded-full transition-colors hover:bg-sakura/15 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sakura-deep/50"
+          >
             <div className="flex flex-col text-right">
               <span className="text-xs font-semibold text-ink-text">{displayName}</span>
               <span className="text-[10px] text-ink-soft font-medium">
@@ -105,7 +110,7 @@ export default function TopNav() {
             <div className="h-8 w-8 rounded-full border border-sakura/50 bg-sakura/20 flex items-center justify-center font-bold text-xs text-plum select-none">
               {userInitials}
             </div>
-          </div>
+          </button>
         </div>
 
       </div>
