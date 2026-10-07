@@ -186,7 +186,7 @@ export default function Editor({ initialContentJSON, onSave }: EditorProps) {
       </div>
 
       {/* Content area — only mounted when editor is ready */}
-      <div className="p-4 overflow-y-auto">
+      <div data-lenis-prevent className="p-4 overflow-y-auto overscroll-contain">
         <EditorContent editor={editor} />
       </div>
 

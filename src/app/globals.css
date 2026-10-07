@@ -77,6 +77,11 @@
   --border: rgba(138, 90, 120, 0.12);
   --input: rgba(138, 90, 120, 0.08);
 
+  /* Fixed chrome reserved by AppShell: TopNav (h-16) + gap, and the dock
+     (70px panel incl. hover magnification + bottom-6 offset). */
+  --chrome-top: 5rem;
+  --chrome-bottom: calc(70px + 1.5rem + env(safe-area-inset-bottom, 0px));
+
   /* shadcn UI Color Bindings */
   --card: var(--surface-glass);
   --card-foreground: var(--text);
@@ -102,7 +107,38 @@
   }
   html {
     @apply h-full;
+    /* Stop pull-to-refresh chaining into the app shell. */
+    overscroll-behavior-y: none;
   }
+
+  /* Scrollbars are hidden app-wide; wheel, trackpad, keyboard and focus
+     scrolling keep working. Edge overflow is signalled by .scroll-cue. */
+  html,
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+}
+
+/* Bottom-edge fade for bar-less scrollers: the "more below" affordance.
+   Put on the scroll container's parent; it never intercepts pointer events. */
+.scroll-cue {
+  position: relative;
+}
+
+.scroll-cue::after {
+  content: "";
+  position: absolute;
+  inset-inline: 1rem;
+  bottom: 0;
+  height: 28px;
+  background: linear-gradient(to top, rgb(251 252 254 / 0.55), transparent);
+  pointer-events: none;
 }
 
 /* Custom Specular Sheen Animation for Liquid Glass */

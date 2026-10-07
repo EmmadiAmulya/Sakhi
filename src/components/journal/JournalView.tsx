@@ -107,7 +107,7 @@ export default function JournalView() {
       initial="initial"
       animate="animate"
       exit="exit"
-      className="space-y-6 w-full max-w-4xl mx-auto flex flex-col h-[calc(100vh-10rem)]"
+      className="space-y-6 w-full max-w-4xl mx-auto flex flex-col h-[calc(100dvh-var(--chrome-top)-var(--chrome-bottom))]"
     >
       <AnimatePresence mode="wait">
         
@@ -227,7 +227,7 @@ export default function JournalView() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="space-y-4 flex-1 flex flex-col min-h-0"
+            className="space-y-4 flex-1 flex flex-col min-h-0 scroll-cue"
           >
             {/* Title / Action bar */}
             <div className="flex justify-between items-center bg-surface-glass/40 border border-border/50 p-4 rounded-2xl flex-shrink-0">
@@ -246,7 +246,10 @@ export default function JournalView() {
             </div>
 
             {/* Timeline scroll panel */}
-            <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
+            <div
+              data-lenis-prevent
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3.5 pr-1"
+            >
               <AnimatePresence initial={false}>
                 {journalEntries.length === 0 ? (
                   <GlassCard className="p-8 text-center space-y-4 rounded-3xl">

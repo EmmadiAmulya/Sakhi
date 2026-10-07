@@ -39,7 +39,7 @@ export default function PersonaChat({ personaId, setActiveTab }: PersonaChatProp
       initial="initial"
       animate="animate"
       exit="exit"
-      className="space-y-6 w-full max-w-4xl mx-auto flex flex-col h-[calc(100vh-10rem)]"
+      className="space-y-6 w-full max-w-4xl mx-auto flex flex-col h-[calc(100dvh-var(--chrome-top)-var(--chrome-bottom))]"
     >
       {/* Title / Persona Banner */}
       <section className="flex justify-between items-center bg-surface-glass/40 border border-border/50 p-4 rounded-2xl flex-shrink-0">
@@ -64,9 +64,13 @@ export default function PersonaChat({ personaId, setActiveTab }: PersonaChatProp
         </button>
       </section>
 
-      {/* Messages Panel */}
-      <GlassCard className="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col min-h-0 relative rounded-3xl">
-        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+      {/* Messages Panel — the card clips; the inner list is the single scroller */}
+      <GlassCard className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col min-h-0 relative rounded-3xl scroll-cue">
+        <div
+          ref={scrollRef}
+          data-lenis-prevent
+          className="flex-1 overflow-y-auto overscroll-contain space-y-4 pr-1"
+        >
           <AnimatePresence initial={false}>
             {view.map((msg) => {
               const isUser = msg.sender === "user";
@@ -200,7 +204,6 @@ export default function PersonaChat({ personaId, setActiveTab }: PersonaChatProp
               </motion.div>
             )}
           </AnimatePresence>
-          <div ref={scrollRef} />
         </div>
       </GlassCard>
 

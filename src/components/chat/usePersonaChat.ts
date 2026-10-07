@@ -61,8 +61,11 @@ export function usePersonaChat(personaId: Persona["id"]) {
     return [...base, ...messages];
   }, [history, messages, displayName, persona.introMessage]);
 
+  // Scroll the list itself. scrollIntoView() walks every scrollable ancestor
+  // (including the Lenis-controlled window), which drags the page behind the view.
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    const list = scrollRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
   }, [view, isTyping]);
 
   const appendBot = (text: string, isEmergency = false) => {
