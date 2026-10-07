@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { DayPicker } from "react-day-picker";
 import { CalendarHeart, ShieldAlert } from "lucide-react";
 import { useProfileStore } from "@/lib/store/profile";
+import { useCycleLogsSync } from "@/lib/data/cycle-logs";
 import {
   calculateCycle,
   refineCycleMetrics,
@@ -23,6 +24,9 @@ export default function CalendarView() {
   const profile = useProfileStore((state) => state.profile);
   const cycleLogs = useProfileStore((state) => state.cycleLogs);
 
+  // Hydrate cycle logs from Supabase into the store (source for reads below).
+  useCycleLogsSync();
+
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isLogSheetOpen, setIsLogSheetOpen] = useState(false);
 
@@ -40,6 +44,8 @@ export default function CalendarView() {
     new Date()
   );
 
+  const hasCycleData = !!profile.lastPeriodDate;
+
   const daysUntilNextPeriod = currentCalc.daysUntilNextPeriod;
   const cycleDay = currentCalc.cycleDay;
   const currentPhase = currentCalc.phase;
@@ -49,15 +55,19 @@ export default function CalendarView() {
     .filter((l) => l.isPeriod)
     .map((l) => parseISO(l.date));
 
-  const predictedPeriodDays: Date[] = currentCalc.periodWindow.filter(
-    (d) => !loggedPeriodDays.some((lp) => isSameDay(lp, d))
-  );
+  const predictedPeriodDays: Date[] = hasCycleData
+    ? currentCalc.periodWindow.filter(
+        (d) => !loggedPeriodDays.some((lp) => isSameDay(lp, d))
+      )
+    : [];
 
-  const fertileDays: Date[] = currentCalc.fertileWindow.filter(
-    (d) => !isSameDay(d, currentCalc.ovulationDate)
-  );
+  const fertileDays: Date[] = hasCycleData
+    ? currentCalc.fertileWindow.filter(
+        (d) => !isSameDay(d, currentCalc.ovulationDate)
+      )
+    : [];
 
-  const ovulationDays: Date[] = [currentCalc.ovulationDate];
+  const ovulationDays: Date[] = hasCycleData ? [currentCalc.ovulationDate] : [];
 
   // Days that have symptom/note dots (for CSS class)
   const loggedDotDays: Date[] = Object.values(cycleLogs)
@@ -73,6 +83,14 @@ export default function CalendarView() {
       className="space-y-6 w-full max-w-4xl mx-auto"
     >
       {/* Header Metrics Grid */}
+      {!hasCycleData ? (
+        <GlassCard className="p-4 flex items-center gap-3">
+          <ShieldAlert className="h-5 w-5 text-plum flex-shrink-0" />
+          <p className="text-xs text-ink-soft leading-relaxed">
+            Add your last period date in Settings to see your current phase, cycle progress, and next period prediction. You can still log days below.
+          </p>
+        </GlassCard>
+      ) : (
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
         <GlassCard className="p-4 flex items-center gap-3">
@@ -106,6 +124,7 @@ export default function CalendarView() {
         </GlassCard>
 
       </section>
+      )}
 
       {/* Main Grid — Calendar + Phase Insight (stacked on mobile, side-by-side on md+) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -126,9 +145,13 @@ export default function CalendarView() {
               }}
               modifiers={{
                 loggedPeriod: loggedPeriodDays,
-                predictedPeriod: predictedPeriodDays,
-                fertile: fertileDays,
-                ovulation: ovulationDays,
+                ...(hasCycleData
+                  ? {
+                      predictedPeriod: predictedPeriodDays,
+                      fertile: fertileDays,
+                      ovulation: ovulationDays,
+                    }
+                  : {}),
                 hasDot: loggedDotDays,
               }}
               modifiersClassNames={{
@@ -149,6 +172,8 @@ export default function CalendarView() {
                 <span className="w-3.5 h-3.5 rounded bg-[#d56f96]/35 border border-[#d56f96]/40 shadow-inner flex-shrink-0" />
                 <span>Logged Period</span>
               </div>
+              {hasCycleData && (
+                <>
               <div className="flex items-center gap-2">
                 <span className="w-3.5 h-3.5 rounded border border-dashed border-[#d56f96]/50 bg-[#d56f96]/10 flex-shrink-0" />
                 <span>Predicted Period</span>
@@ -161,6 +186,8 @@ export default function CalendarView() {
                 <span className="w-3.5 h-3.5 rounded bg-[#8a5a78]/30 border border-[#8a5a78]/50 flex-shrink-0" />
                 <span>Est. Ovulation</span>
               </div>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-3 pt-1 border-t border-border/10 justify-center">
               <div className="flex items-center gap-1">
@@ -181,7 +208,7 @@ export default function CalendarView() {
         </GlassCard>
 
         {/* Phase Insight Card */}
-        <PhaseInsightCard phaseId={currentPhase.id} />
+        {hasCycleData && <PhaseInsightCard phaseId={currentPhase.id} />}
 
       </div>
 

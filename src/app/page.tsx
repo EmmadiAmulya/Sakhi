@@ -3,8 +3,7 @@
 import React from "react";
 import AppShell from "@/components/layout/AppShell";
 import DashboardView from "@/components/dashboard/DashboardView";
-import SakhiView from "@/components/dashboard/SakhiView";
-import MayaView from "@/components/dashboard/MayaView";
+import PersonaChat from "@/components/chat/PersonaChat";
 import SettingsView from "@/components/dashboard/SettingsView";
 import CalendarView from "@/components/cycle/CalendarView";
 import JournalView from "@/components/journal/JournalView";
@@ -25,10 +24,10 @@ export default function Home() {
               <CalendarView key="cycle" />
             )}
             {activeTab === "sakhi" && (
-              <SakhiView key="sakhi" setActiveTab={setActiveTab} />
+              <PersonaChat key="sakhi" personaId="sakhi" setActiveTab={setActiveTab} />
             )}
             {activeTab === "maya" && (
-              <MayaView key="maya" setActiveTab={setActiveTab} />
+              <PersonaChat key="maya" personaId="maya" setActiveTab={setActiveTab} />
             )}
             {activeTab === "journal" && (
               <JournalErrorBoundary key="journal">

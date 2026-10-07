@@ -3,7 +3,9 @@
 import React, { useState } from "react";
 import { X, Droplet, Sparkles, Smile, Flame, BookOpen, Trash2 } from "lucide-react";
 import { useProfileStore } from "@/lib/store/profile";
+import { useUpsertCycleLog, useDeleteCycleLog } from "@/lib/data/cycle-logs";
 import { CycleLog } from "@/lib/cycle";
+import { MOODS } from "@/lib/moods";
 import GlassButton from "@/components/ui/GlassButton";
 import { format } from "date-fns";
 
@@ -25,22 +27,11 @@ const SYMPTOM_LIBRARY = [
   "Insomnia",
 ];
 
-const MOODS = [
-  { id: "serene", label: "Serene 🌸" },
-  { id: "energetic", label: "Energetic ⚡" },
-  { id: "sensitive", label: "Sensitive 🥺" },
-  { id: "fatigued", label: "Fatigued 😴" },
-  { id: "reflective", label: "Reflective 🧘" },
-  { id: "anxious", label: "Anxious 😰" },
-  { id: "down", label: "Down 😔" },
-  { id: "happy", label: "Happy 😊" },
-  { id: "stressed", label: "Stressed 😫" },
-  { id: "irritable", label: "Irritable 😠" },
-];
-
 export default function DayDetailSheet({ date, onClose }: DayDetailSheetProps) {
   const dateStr = format(date, "yyyy-MM-dd");
-  const { cycleLogs, setCycleLog, deleteCycleLog } = useProfileStore();
+  const cycleLogs = useProfileStore((s) => s.cycleLogs);
+  const upsertLog = useUpsertCycleLog();
+  const deleteLog = useDeleteCycleLog();
 
   const existingLog = cycleLogs[dateStr];
 
@@ -66,12 +57,12 @@ export default function DayDetailSheet({ date, onClose }: DayDetailSheetProps) {
       ...(isPeriod ? { flow: flow || "medium" } : { flow: undefined }),
     };
 
-    setCycleLog(dateStr, logData);
+    upsertLog.mutate({ date: dateStr, log: logData });
     onClose();
   };
 
   const handleDelete = () => {
-    deleteCycleLog(dateStr);
+    deleteLog.mutate(dateStr);
     onClose();
   };
 
@@ -87,7 +78,7 @@ export default function DayDetailSheet({ date, onClose }: DayDetailSheetProps) {
         className="absolute inset-0" 
         onClick={onClose} 
       />
-      <div className="relative w-full max-w-md h-full bg-gradient-to-b from-surface-white/60 via-surface-white/45 to-surface-white/55 backdrop-blur-xl border-l border-border/80 p-6 shadow-glass flex flex-col justify-between overflow-y-auto z-10 animate-slide-in-right">
+      <div className="relative w-full max-w-md h-full bg-gradient-to-b from-surface-white/60 via-surface-white/45 to-surface-white/55 backdrop-blur-xl border-l border-border/80 p-6 shadow-glass flex flex-col overflow-hidden z-10 animate-slide-in-right scroll-cue">
         
         {/* Header */}
         <div className="space-y-2 flex-shrink-0">
@@ -108,8 +99,11 @@ export default function DayDetailSheet({ date, onClose }: DayDetailSheetProps) {
           </p>
         </div>
 
-        {/* Content Form Scrollable */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-5 pr-1 my-2">
+        {/* Content Form Scrollable — the only scroller; header and footer stay pinned */}
+        <div
+          data-lenis-prevent
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-4 space-y-5 pr-1 my-2"
+        >
           
           {/* Period Toggle */}
           <div className="bg-surface-glass/40 border border-border/40 p-4 rounded-2xl space-y-3">

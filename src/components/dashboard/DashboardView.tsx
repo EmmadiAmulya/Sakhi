@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { Droplet, Sparkles, Bed, Plus, Check, Heart, Stethoscope } from "lucide-react";
+import { Droplet, Sparkles, Bed, Plus, Minus, Check, Heart, Stethoscope } from "lucide-react";
 import GlassButton from "@/components/ui/GlassButton";
 import { BentoGrid, BentoCard, NavCard } from "@/components/dashboard/BentoGrid";
-import { 
-  mockDailyHabits, 
-  mockSupplements as initialSupplements, 
-  Supplement 
-} from "@/lib/mock-data";
 import { useProfileStore, getCurrentCycleDay, getCyclePhase } from "@/lib/store/profile";
+import { useSupplementsToday, useToggleSupplement } from "@/lib/data/supplements";
+import { useTodayMoodLog, useUpsertMoodLog } from "@/lib/data/mood-logs";
+import { useHabitValue, useSetHabitValue } from "@/lib/data/habits";
+import { useAddJournalEntry } from "@/lib/data/journal";
+import { useDevSeed } from "@/lib/data/dev-seed";
+import { MOODS } from "@/lib/moods";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
 
@@ -20,41 +21,92 @@ interface DashboardViewProps {
 export default function DashboardView({ setActiveTab }: DashboardViewProps) {
   const profile = useProfileStore((state) => state.profile);
 
-  // Local state for interactiveness
-  const [supplements, setSupplements] = useState<Supplement[]>(initialSupplements);
-  const [waterIntake, setWaterIntake] = useState(mockDailyHabits.waterIntake);
-  const [selectedMood, setSelectedMood] = useState(mockDailyHabits.mood);
+  // Dev-only mock seed (no-op unless NEXT_PUBLIC_ENABLE_DEV_SEED=true)
+  useDevSeed();
+
+  // Supplements + mood + water + sleep persist to Supabase.
+  const { data: supplements = [] } = useSupplementsToday();
+  const toggleSupp = useToggleSupplement();
+  const { data: todayMood } = useTodayMoodLog();
+  const upsertMood = useUpsertMoodLog();
+  const addJournalEntry = useAddJournalEntry();
+
+  const SLEEP_TARGET = 8;
+  const WATER_TARGET = 2000;
+
+  const { data: waterData } = useHabitValue("Water");
+  const waterValue = waterData ?? 0;
+  const setWater = useSetHabitValue("Water");
+
+  const { data: sleepData } = useHabitValue("Sleep");
+  const sleepValue = sleepData ?? 0;
+  const setSleep = useSetHabitValue("Sleep");
+
+  const [selectedMood, setSelectedMood] = useState<string | undefined>(undefined);
+  const activeMood = selectedMood ?? todayMood?.mood ?? undefined;
   const [journalNote, setJournalNote] = useState("");
   const [noteSaved, setNoteSaved] = useState(false);
 
   // Dynamically compute cycle status
+  const hasCycleData = !!profile.lastPeriodDate;
   const cycleDay = getCurrentCycleDay(profile.lastPeriodDate, profile.cycleLength);
   const phase = getCyclePhase(cycleDay, profile.cycleLength);
-  const daysUntilNextPeriod = profile.lastPeriodDate
+  const daysUntilNextPeriod = hasCycleData
     ? Math.max(0, profile.cycleLength - cycleDay)
-    : 16;
+    : 0;
 
   const toggleSupplement = (id: string) => {
-    setSupplements(prev =>
-      prev.map(sup => (sup.id === id ? { ...sup, taken: !sup.taken } : sup))
-    );
+    const current = supplements.find((s) => s.id === id);
+    if (!current) return;
+    toggleSupp.mutate({ id, taken: !current.taken });
   };
 
   const addWater = () => {
-    setWaterIntake(prev => Math.min(prev + 250, mockDailyHabits.waterTarget));
+    setWater.mutate(Math.min(waterValue + 250, WATER_TARGET));
   };
+
+  const adjustSleep = (delta: number) => {
+    const next = Math.round(Math.min(24, Math.max(0, sleepValue + delta)) * 10) / 10;
+    setSleep.mutate(next);
+  };
+
+  const sleepProgress = Math.min(100, (sleepValue / SLEEP_TARGET) * 100);
 
   const handleSaveNote = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!journalNote.trim()) return;
-    setNoteSaved(true);
-    setTimeout(() => {
-      setNoteSaved(false);
-      setJournalNote("");
-    }, 2000);
+    const note = journalNote.trim();
+    if (!note || addJournalEntry.isPending) return;
+
+    addJournalEntry.mutate(
+      {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        contentJSON: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: note }],
+            },
+          ],
+        },
+        contentText: note,
+        mood: activeMood,
+        cyclePhase: hasCycleData ? phase.id : "",
+      },
+      {
+        onSuccess: () => {
+          setNoteSaved(true);
+          setJournalNote("");
+          setTimeout(() => {
+            setNoteSaved(false);
+          }, 2500);
+        },
+      }
+    );
   };
 
-  const waterProgress = (waterIntake / mockDailyHabits.waterTarget) * 100;
+  const waterProgress = (waterValue / WATER_TARGET) * 100;
   const takenSupplementsCount = supplements.filter(s => s.taken).length;
   const displayName = profile.name || "Amulya";
 
@@ -72,8 +124,19 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
           こんにちは, <span className="text-sakura-deep">{displayName}</span>
         </h1>
         <p className="text-sm md:text-base text-ink-soft max-w-2xl leading-relaxed">
-          Your body is in the <span className="font-semibold text-plum">{phase.name}</span> (Day {cycleDay} of {profile.cycleLength}). Estrogen is rising, supporting focus and creative projects.
+          {hasCycleData ? (
+            <>
+              Your body is in the <span className="font-semibold text-plum">{phase.name}</span> (Day {cycleDay} of {profile.cycleLength}). {phase.description}
+            </>
+          ) : (
+            "Add your last period date in Settings to unlock cycle predictions and phase insights."
+          )}
         </p>
+        {!hasCycleData && (
+          <GlassButton variant="secondary" className="text-xs" onClick={() => setActiveTab("settings")}>
+            Open Settings
+          </GlassButton>
+        )}
       </section>
 
       {/* Restructured Bento Grid Layout */}
@@ -84,6 +147,19 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
           span={2} 
           className="flex flex-col md:flex-row items-center gap-8 justify-between min-h-[220px]"
         >
+          {!hasCycleData ? (
+            <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left gap-3">
+              <Sparkles className="h-6 w-6 text-sakura-deep" />
+              <h2 className="text-lg font-bold text-ink-text font-serif">Unlock Your Cycle Insights</h2>
+              <p className="text-xs leading-relaxed text-ink-soft max-w-md">
+                Add your last period date in Settings to unlock cycle predictions and phase insights.
+              </p>
+              <GlassButton variant="primary" onClick={() => setActiveTab("settings")}>
+                Go to Settings
+              </GlassButton>
+            </div>
+          ) : (
+          <>
           {/* Visual Cycle Progress Ring */}
           <div 
             onClick={() => setActiveTab("cycle")}
@@ -141,6 +217,8 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
               </GlassButton>
             </div>
           </div>
+          </>
+          )}
         </BentoCard>
 
         {/* Card 2: Daily Habits (Span 1) */}
@@ -157,7 +235,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
                 Water Intake
               </span>
               <span className="text-ink-text font-semibold">
-                {waterIntake}ml / {mockDailyHabits.waterTarget}ml
+                {waterValue}ml / {WATER_TARGET}ml
               </span>
             </div>
             <div className="flex items-center gap-2.5">
@@ -169,7 +247,7 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
               </div>
               <GlassButton 
                 onClick={addWater}
-                disabled={waterIntake >= mockDailyHabits.waterTarget}
+                disabled={waterValue >= WATER_TARGET}
                 className="p-1 h-6 w-6 rounded-full border-sky-400/20 hover:bg-sky-400/10"
                 aria-label="Add 250ml water"
               >
@@ -186,32 +264,53 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
                 Sleep Log
               </span>
               <span className="text-ink-text font-semibold">
-                {mockDailyHabits.sleepHours}h / {mockDailyHabits.sleepTarget}h
+                {sleepValue}h / {SLEEP_TARGET}h
               </span>
             </div>
-            <div className="h-1.5 bg-border/20 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-purple-400/70 rounded-full" 
-                style={{ width: `${(mockDailyHabits.sleepHours / mockDailyHabits.sleepTarget) * 100}%` }}
-              />
+            <div className="flex items-center gap-2.5">
+              <GlassButton
+                onClick={() => adjustSleep(-0.5)}
+                disabled={sleepValue <= 0}
+                className="p-1 h-6 w-6 rounded-full border-purple-400/20 hover:bg-purple-400/10"
+                aria-label="Decrease sleep by 0.5h"
+              >
+                <Minus className="h-3 w-3 text-purple-500" />
+              </GlassButton>
+              <div className="flex-1 h-1.5 bg-border/20 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-purple-400/70 rounded-full transition-all duration-500"
+                  style={{ width: `${sleepProgress}%` }}
+                />
+              </div>
+              <GlassButton
+                onClick={() => adjustSleep(0.5)}
+                disabled={sleepValue >= 24}
+                className="p-1 h-6 w-6 rounded-full border-purple-400/20 hover:bg-purple-400/10"
+                aria-label="Increase sleep by 0.5h"
+              >
+                <Plus className="h-3 w-3 text-purple-500" />
+              </GlassButton>
             </div>
           </div>
 
           {/* Mood Buttons */}
           <div className="space-y-1.5 pt-1.5 border-t border-border/20">
             <span className="text-[11px] font-medium text-ink-soft">Daily Mood</span>
-            <div className="flex gap-1 justify-between">
-              {(["serene", "energetic", "sensitive", "fatigued", "reflective"] as const).map((m) => (
+            <div className="flex flex-wrap gap-1">
+              {MOODS.map((m) => (
                 <button
-                  key={m}
-                  onClick={() => setSelectedMood(m)}
-                  className={`flex-1 py-1 rounded-md text-[9px] font-semibold transition-all capitalize cursor-pointer border ${
-                    selectedMood === m
+                  key={m.id}
+                  onClick={() => {
+                    setSelectedMood(m.id);
+                    upsertMood.mutate({ mood: m.id });
+                  }}
+                  className={`px-2 py-1 rounded-md text-[9px] font-semibold transition-all cursor-pointer border ${
+                    activeMood === m.id
                       ? "bg-sakura-deep/15 text-sakura-deep border-sakura-deep/30 shadow-inner"
                       : "bg-surface-glass/40 border-transparent text-ink-soft hover:bg-surface-glass/85"
                   }`}
                 >
-                  {m}
+                  {m.label}
                 </button>
               ))}
             </div>
@@ -286,9 +385,9 @@ export default function DashboardView({ setActiveTab }: DashboardViewProps) {
               variant={noteSaved ? "primary" : "secondary"} 
               type="submit" 
               className="py-2.5 text-xs font-semibold w-full transition-all"
-              disabled={!journalNote.trim()}
+              disabled={!journalNote.trim() || addJournalEntry.isPending}
             >
-              {noteSaved ? "Note Logged ✓" : "Save Daily Note"}
+              {addJournalEntry.isPending ? "Saving..." : noteSaved ? "Note Logged ✓" : "Save Daily Note"}
             </GlassButton>
           </form>
         </BentoCard>

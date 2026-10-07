@@ -1,0 +1,54 @@
+Love this — mapping the wiring before touching code is exactly the right move. Here's the full **frontend ↔ backend connection map** for Sakhi.
+
+First, the key architectural insight that makes everything clearer: you have **two connection patterns**, and every feature falls into one of them.
+
+- **🟢 Direct (browser → Supabase):** All user *data* (profile, cycle, journal, logs) goes straight from the client to Postgres, protected by **Row-Level Security**. No custom backend needed.
+- **🔵 Proxied (browser → your Next.js server route → external service):** Anything involving a **secret key or RAG** (i.e., the AI). The NVIDIA NIM key must *never* touch the browser, so AI calls route through a server handler.
+
+---
+
+## 🔌 Connection map (by frontend surface)
+
+| Frontend surface | Connection needed | Backend service | What flows / context |
+| --- | --- | --- | --- |
+| **Login screen** | 🟢 Auth — magic link | Supabase Auth | Email → magic link → session (JWT). Replaces the mock login. |
+| **Onboarding form** | 🟢 Create profile | Supabase `profiles` (RLS) | On first login, write name/age/height/weight/cycle settings. |
+| **Auth gate / hydration** | 🟢 Session check | Supabase Auth | Read session on load → route to login / onboarding / app. |
+| **Top nav + greeting** | 🟢 Read profile | `profiles` | Name, cycle day/phase derive from DB, not local store. |
+| **Cycle calendar + day sheet** | 🟢 CRUD logs | `cycle_logs` (RLS) | Read month, upsert period/flow/symptoms/mood per day. |
+| **Predictions / phase insights** | computed | (client or RPC) | From `cycle_logs`  • profile. Can stay client-side; optionally a SQL function. |
+| **Journal editor** | 🟢 Upsert entries | `journal_entries` (RLS) | Debounced autosave of Tiptap JSON; mood + phase stamp. *(Candidate for field-level encryption.)* |
+| **Mood / habits / supplements** | 🟢 CRUD logs | `mood_logs`, `habits/habit_logs`, `supplements/supplement_logs` | Dashboard loggers persist to DB. |
+| **Trends (Recharts)** | 🟢 Read/aggregate | logs tables or SQL views | Mood/energy vs phase, symptom frequency. |
+| **🌸 Sakhi chat** | 🔵 AI completion | **Server route → NVIDIA NIM Nemotron** | Server assembles: Sakhi system prompt + name + current cycle phase + recent mood/journal sentiment → streamed reply. |
+| **🩺 Maya chat** | 🔵 AI + RAG | **Server route → pgvector retrieval → NIM** | Embed query → `match_document_chunks` (top-k) → inject + Maya system prompt + safety disclaimer → streamed, *cited* reply. |
+| **Chat history** | 🟢 Persist | `chat_sessions`, `chat_messages` (RLS) | Save/restore conversations per persona. |
+| **RAG knowledge (the 5 research .md docs)** | 🔵 Ingestion (one-time/admin) | **Embedding pipeline → NIM embeddings → `document_chunks`** | chunk → embed → store `vector(dim)`. Powers Maya. |
+| **Reminders settings** | 🟢 Store prefs | `reminder_preferences` (RLS) | Toggles + times persist. |
+| **Reminders delivery (real/background)** | 🔵 Scheduled push | **Cron (Vercel/Supabase) + Web Push (VAPID) + service worker** | The piece you deferred — needs a scheduler + push service, not just the browser. |
+
+---
+
+## 🔑 Secrets & environment (who holds what)
+
+- **Client-safe:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **Server-only (never exposed):** `NVIDIA_NIM_API_KEY`, Supabase `SERVICE_ROLE_KEY` (admin tasks like ingestion), Web-Push `VAPID_PRIVATE_KEY`
+- **Public push key:** `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+
+## 🛡️ Cross-cutting connections (apply to all of the above)
+
+- **RLS everywhere:** `using (auth.uid() = user_id) with check (auth.uid() = user_id)` on every user table.
+- **AI endpoint hardening:** auth-check the server route, rate-limit it, and run Maya's safety filter (disclaimers + red-flag → helpline escalation) server-side.
+- **Local-first sync (optional):** keep the Zustand store as an offline cache, sync to Supabase, reconcile on reconnect (ties into the Serwist PWA).
+
+## 🪜 Suggested wiring order (low-risk → high-value)
+
+1. **Auth** (magic link) + **profiles** — unblocks everything, replaces mock gate.
+2. **Cycle + journal + logs** CRUD (direct Supabase + RLS) — migrate off local store.
+3. **AI server route + Sakhi** (NIM, context assembly, streaming) — the first "real AI" moment.
+4. **RAG ingestion + Maya** (embeddings + pgvector + citations) — the differentiator.
+5. **Real reminders** (cron + web-push) — last, since it needs the scheduler infra.
+
+---
+
+This list is essentially the spine of your **architecture doc**. Want me to capture it — the two connection patterns, this wiring table, the schema/RLS, and the 5-step order — into a **"Sakhi — Architecture & Integration"** page under the project brief, so the backend phase has a single source of truth? That's the natural next artifact before we write the first backend task.

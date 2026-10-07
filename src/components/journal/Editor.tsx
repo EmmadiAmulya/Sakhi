@@ -27,6 +27,15 @@ function sanitizeContent(raw: JSONContent | null): JSONContent {
 
 export default function Editor({ initialContentJSON, onSave }: EditorProps) {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // useEditor captures the initial onSave/onUpdate closures, so route the
+  // dispatch through refs that always hold the latest callback + content.
+  const onSaveRef = useRef(onSave);
+  const latestContentRef = useRef<{ json: JSONContent; text: string } | null>(null);
+  const pendingRef = useRef(false);
+
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -42,19 +51,35 @@ export default function Editor({ initialContentJSON, onSave }: EditorProps) {
     onUpdate: ({ editor }) => {
       const json = editor.getJSON();
       const text = editor.getText();
+      latestContentRef.current = { json, text };
 
       // Debounced autosave (1 s)
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      pendingRef.current = true;
       saveTimeoutRef.current = setTimeout(() => {
-        onSave(json, text);
+        pendingRef.current = false;
+        onSaveRef.current(json, text);
       }, 1000);
     },
   });
 
-  // Cleanup: flush pending save and destroy editor to prevent double-mount leaks
+  // Flush pending save on unmount or tab-hide, then destroy editor to prevent double-mount leaks
   useEffect(() => {
-    return () => {
+    const flush = () => {
+      if (!pendingRef.current) return;
+      pendingRef.current = false;
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      const snapshot = latestContentRef.current;
+      if (snapshot) onSaveRef.current(snapshot.json, snapshot.text);
+    };
+    const onVisibilityChange = () => {
+      // sendBeacon can't attach Supabase's Authorization header, so flush via the normal save path
+      if (document.hidden) flush();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      flush();
       editor?.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,7 +186,7 @@ export default function Editor({ initialContentJSON, onSave }: EditorProps) {
       </div>
 
       {/* Content area — only mounted when editor is ready */}
-      <div className="p-4 overflow-y-auto">
+      <div data-lenis-prevent className="p-4 overflow-y-auto overscroll-contain">
         <EditorContent editor={editor} />
       </div>
 

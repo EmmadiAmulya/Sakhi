@@ -1,14 +1,24 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache } from "@tanstack/react-query";
 import Lenis from "lenis";
+import Toaster from "@/components/ui/Toaster";
+import { toast } from "@/lib/toast";
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
   // QueryClient initialization
   const [queryClient] = useState(
     () =>
       new QueryClient({
+        // Surface query failures once, consistently (mutations toast at the call site).
+        queryCache: new QueryCache({
+          onError: (error) => {
+            toast.error(
+              error instanceof Error ? error.message : "Couldn't load your data. Please try again."
+            );
+          },
+        }),
         defaultOptions: {
           queries: {
             refetchOnWindowFocus: false,
@@ -19,6 +29,13 @@ export default function ClientProviders({ children }: { children: React.ReactNod
   );
 
   useEffect(() => {
+    // Register the PWA service worker (installability; see public/sw.js).
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Non-fatal: app works without installability.
+      });
+    }
+
     // Guard against prefers-reduced-motion
     const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (reducedMotionQuery.matches) {
@@ -49,6 +66,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      <Toaster />
     </QueryClientProvider>
   );
 }

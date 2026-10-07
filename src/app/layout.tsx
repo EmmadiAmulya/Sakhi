@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Serif_JP, Quicksand } from "next/font/google";
 import "./globals.css";
 import AppBackground from "@/components/background/AppBackground";
@@ -16,6 +16,10 @@ const notoSerifJP = Noto_Serif_JP({
   subsets: ["latin"],
   weight: ["300", "400", "500", "700"],
 });
+
+export const viewport: Viewport = {
+  themeColor: "#d56f96",
+};
 
 export const metadata: Metadata = {
   title: "Sakhi — Women's Health Companion",

@@ -1,25 +1,103 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Settings, Lock, HardDrive, Bell, User, AlertCircle } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
 import { useProfileStore } from "@/lib/store/profile";
+import { useRemindersSync, useUpdateReminders } from "@/lib/data/reminders";
 import OnboardingForm from "@/components/auth/OnboardingForm";
+import { createClient } from "@/lib/supabase/client";
+import { db, requireUserId } from "@/lib/data/client";
+import { fetchUserDataExport, downloadUserDataExport, importUserDataExport } from "@/lib/data/export";
+import { toast } from "@/lib/toast";
 import { motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
 
 export default function SettingsView() {
-  const [anonymity, setAnonymity] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<string>(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      return Notification.permission;
-    }
-    return "default";
-  });
+  const [permissionStatus, setPermissionStatus] = useState<string>(() =>
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
+  );
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { profile, logout, reminders, updateReminders } = useProfileStore();
+  const profile = useProfileStore((s) => s.profile);
+  const logout = useProfileStore((s) => s.logout);
+  const reminders = useProfileStore((s) => s.reminders);
+
+  // Hydrate reminder prefs from Supabase, and persist changes via the hook
+  // (optimistic store update + rollback + toast).
+  useRemindersSync();
+  const updateRemindersMutation = useUpdateReminders();
+  const updateReminders = (prefs: Parameters<typeof updateRemindersMutation.mutate>[0]) =>
+    updateRemindersMutation.mutate(prefs);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const data = await fetchUserDataExport();
+      downloadUserDataExport(data);
+      toast.success("Export downloaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      let raw: unknown;
+      try {
+        raw = JSON.parse(text);
+      } catch {
+        toast.error("That file is not valid JSON.");
+        return;
+      }
+      if (!window.confirm("This will overwrite/restore your current Sakhi data from the backup. Continue?")) {
+        return;
+      }
+      const { imported, errors } = await importUserDataExport(raw);
+      if (errors.length === 0) {
+        toast.success(`Import complete: restored ${imported.length} table${imported.length === 1 ? "" : "s"}.`);
+      } else {
+        toast.error(`Import finished: ${imported.length} table(s) restored, ${errors.length} error(s). ${errors[0]}`);
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleResetAll = async () => {
+    if (!window.confirm("This permanently deletes all your Sakhi data. Continue?")) return;
+    setResetting(true);
+    try {
+      const userId = await requireUserId();
+      const userTables = ["chat_sessions", "habits", "supplements", "cycle_logs", "mood_logs", "journal_entries", "reminder_preferences"] as const;
+      for (const table of userTables) {
+        const { error } = await db().from(table).delete().eq("user_id", userId);
+        if (error) throw new Error(`${table}: ${error.message}`);
+      }
+      const { error: profileError } = await db().from("profiles").delete().eq("id", userId);
+      if (profileError) throw new Error(`profiles: ${profileError.message}`);
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      logout();
+      toast.success("Account data deleted. You have been signed out.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Reset failed. Some data may remain.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleRequestPermission = async () => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -114,20 +192,27 @@ export default function SettingsView() {
           <div className="space-y-3 text-xs">
             <div className="flex items-center justify-between p-2 rounded-lg bg-surface-glass/40">
               <div className="flex flex-col">
-                <span className="font-semibold text-ink-text">Zero-Knowledge Storage</span>
-                <span className="text-[10px] text-ink-soft">Data encrypted locally using workspace credentials.</span>
+                <span className="font-semibold text-ink-text">Row-Level Security</span>
+                <span className="text-[10px] text-ink-soft">Your rows are readable only by your signed-in account.</span>
               </div>
               <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">ACTIVE</span>
             </div>
 
-            <div className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-glass/30 transition-all cursor-pointer" onClick={() => setAnonymity(!anonymity)}>
+            <div className="flex items-center justify-between p-2 rounded-lg bg-surface-glass/40">
               <div className="flex flex-col">
-                <span className="font-semibold text-ink-text">Anonymized Telemetry</span>
-                <span className="text-[10px] text-ink-soft">Scrub diagnostic logs and disable health metrics tracking.</span>
+                <span className="font-semibold text-ink-text">Clear on-device cache</span>
+                <span className="text-[10px] text-ink-soft">Remove locally cached profile data from this browser.</span>
               </div>
-              <div className={`h-5 w-9 rounded-full transition-colors flex items-center p-0.5 ${anonymity ? "bg-sakura-deep" : "bg-border/60"}`}>
-                <div className={`h-4 w-4 bg-white rounded-full transition-transform shadow-sm ${anonymity ? "translate-x-4" : "translate-x-0"}`} />
-              </div>
+              <GlassButton
+                variant="secondary"
+                onClick={() => {
+                  useProfileStore.persist.clearStorage();
+                  toast.success("On-device cache cleared");
+                }}
+                className="py-1 px-3 text-[10px]"
+              >
+                Clear Cache
+              </GlassButton>
             </div>
           </div>
         </GlassCard>
@@ -249,23 +334,46 @@ export default function SettingsView() {
             Data Operations
           </h2>
           
-          <p className="text-xs text-ink-soft leading-relaxed">
-            All your cycle history, companion chats, and log diaries are saved locally inside your web browser. You can export the decrypted JSON database, or import it to sync across browsers.
-          </p>
+<p className="text-xs text-ink-soft leading-relaxed">
+   Your data is stored in your private account, protected by row-level security. Export downloads a JSON copy of your data, and import restores a backup.
+   </p>
 
-          <div className="flex flex-wrap gap-2.5 pt-2">
-            <GlassButton variant="secondary">
-              Export Decrypted JSON
+   <p className="text-xs text-ink-soft leading-relaxed">
+   For any feedback,{" "}
+   <a
+   href="https://forms.gle/UKfALr4rcBfipwPv5"
+   target="_blank"
+   rel="noopener noreferrer"
+   className="font-semibold text-sakura-deep underline underline-offset-2 hover:text-plum transition-colors"
+   >
+   click here
+   </a>
+   .
+   </p>
+   
+   <div className="flex flex-wrap gap-2.5 pt-2">
+            <GlassButton variant="secondary" type="button" onClick={handleExport} disabled={exporting}>
+              {exporting ? "Exporting..." : "Export Decrypted JSON"}
             </GlassButton>
-            <GlassButton variant="secondary">
-              Import Database Backups
+            <GlassButton variant="secondary" type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              {importing ? "Importing..." : "Import Database Backups"}
             </GlassButton>
-            <GlassButton 
-              variant="ghost" 
-              onClick={logout}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              aria-label="Choose backup file to import"
+              onChange={handleImportFile}
+            />
+            <GlassButton
+              variant="ghost"
+              type="button"
+              onClick={handleResetAll}
+              disabled={resetting}
               className="text-red-600 hover:bg-red-50 hover:border-red-100 font-bold"
             >
-              Reset Profile &amp; Logout
+              {resetting ? "Deleting..." : "Reset Profile & Logout"}
             </GlassButton>
           </div>
         </GlassCard>

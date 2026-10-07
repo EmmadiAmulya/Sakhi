@@ -1,13 +1,14 @@
 "use client";
 
 import React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Sparkles, Calendar, Scale, Ruler, User } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import GlassButton from "@/components/ui/GlassButton";
 import { useProfileStore } from "@/lib/store/profile";
+import { useUpsertProfile } from "@/lib/data/profile";
 import { motion } from "framer-motion";
 
 const onboardingSchema = z.object({
@@ -27,12 +28,13 @@ interface OnboardingFormProps {
 }
 
 export default function OnboardingForm({ onSuccess, isEditing = false }: OnboardingFormProps) {
-  const { profile, setProfile, setOnboarded } = useProfileStore();
+  const profile = useProfileStore((s) => s.profile);
+  const upsertProfile = useUpsertProfile();
 
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors, isSubmitting }
   } = useForm<OnboardingValues>({
     resolver: zodResolver(onboardingSchema),
@@ -46,24 +48,27 @@ export default function OnboardingForm({ onSuccess, isEditing = false }: Onboard
     }
   });
 
-  const ageValue = watch("age");
+  // useWatch (vs form.watch) is React-Compiler-safe and avoids the
+  // "incompatible library" memoization warning.
+  const ageValue = useWatch({ control, name: "age" });
 
   const onSubmit = async (data: OnboardingValues) => {
-    // Save to Zustand store
-    setProfile({
-      name: data.name,
-      age: data.age,
-      height: data.height,
-      weight: data.weight,
-      cycleLength: data.cycleLength,
-      lastPeriodDate: data.lastPeriodDate || null,
-    });
-    
-    if (!isEditing) {
-      setOnboarded(true);
+    try {
+      // Persist via the data hook: optimistic store update (profile + onboarded),
+      // rollback + toast on error. Throws on failure so we keep the form open.
+      await upsertProfile.mutateAsync({
+        name: data.name,
+        age: data.age,
+        height: data.height,
+        weight: data.weight,
+        cycleLength: data.cycleLength,
+        lastPeriodDate: data.lastPeriodDate || null,
+        markOnboarded: !isEditing,
+      });
+      onSuccess?.();
+    } catch {
+      // Error toast already surfaced by the mutation; leave the form for retry.
     }
-    
-    onSuccess?.();
   };
 
   return (
@@ -74,7 +79,7 @@ export default function OnboardingForm({ onSuccess, isEditing = false }: Onboard
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-lg z-10"
       >
-        <GlassCard className="p-6 md:p-8 space-y-6 rounded-3xl border border-border bg-gradient-to-tr from-surface-white/40 via-surface-white/20 to-surface-white/50 backdrop-blur-xl saturate-[140%] shadow-glass shadow-glass-inset">
+        <GlassCard animateEntrance={!isEditing} className="p-6 md:p-8 space-y-6 rounded-3xl border border-border bg-gradient-to-tr from-surface-white/40 via-surface-white/20 to-surface-white/50 backdrop-blur-xl saturate-[140%] shadow-glass shadow-glass-inset">
           
           {/* Header */}
           {!isEditing && (

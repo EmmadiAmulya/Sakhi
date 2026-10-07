@@ -1,0 +1,151 @@
+# Data-layer reference
+
+Complete public surface of `src/lib/data/*`, the Supabase schema, server
+routes, and environment. For design rationale, see
+[architecture.md](architecture.md).
+
+## Conventions
+
+Every module follows the same shape (copied from `mood-logs.ts`):
+
+- `fetch*` — plain async function hitting Supabase through `db()`.
+- `use*Sync` / `useToday*` — `useQuery` + effect hydrating the Zustand store.
+- `use*` mutations — optimistic store/cache update → Supabase → rollback +
+  `toast.error` on failure, `toast.success` on success, invalidate on settle.
+- Reads rely on RLS; mutations call `requireUserId()` (throws when signed out).
+- `todayStr()` / `formatClockTime()` (`lib/date.ts`) are the shared local
+  day-boundary and wall-clock helpers.
+
+## Hooks by module
+
+### profile.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `fetchProfile()` | query fn | `.maybeSingle()` — `null` means "needs onboarding" |
+| `useProfileSync()` | hook | refetch entry point (Gate already hydrates for routing) |
+| `useUpsertProfile()` | mutation | `{...ProfileData, markOnboarded?}`; upserts on `profiles.id` |
+
+### cycle-logs.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `fetchCycleLogs()` | query fn | returns `Record<date, CycleLog>` (all rows, RLS-scoped) |
+| `useCycleLogsSync()` | hook | hydrates `store.cycleLogs`; call once per view |
+| `useUpsertCycleLog()` | mutation | `{date, log}`; merges over existing, `flow` forced `"medium"` default / nulled when not a period day; upsert on `(user_id, log_date)` |
+| `useDeleteCycleLog()` | mutation | `(date)` |
+
+### mood-logs.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `fetchMoodLog(date)` | query fn | `.maybeSingle()` → `MoodLog \| null` |
+| `useTodayMoodLog()` | hook | `[...moodLogs, today]`; `staleTime` 60s |
+| `useUpsertMoodLog()` | mutation | `Partial<MoodLog>`; upsert on `(user_id, log_date)` (unique added in 0004) |
+
+### habits.ts (quantitative: water ml, sleep hours)
+
+| Export | Kind | Notes |
+|---|---|---|
+| `useHabitValue(name)` | hook | today's `habit_logs.value` for the named habit; `null` when unlogged |
+| `useSetHabitValue(name)` | mutation | `(value)`; auto-creates the `habits` row on first use (unique `(user_id, name)` in 0005; insert races re-read); upserts on `(habit_id, log_date)`; sets `done = value > 0` |
+
+Habit names in use: `"Water"` (ml) and `"Sleep"` (hours, ±0.5h stepper on the dashboard).
+
+### supplements.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `fetchSupplementsToday()` | query fn | seeds 4 defaults (Folic Acid, D3, Magnesium Glycinate, Omega 3) when the user has zero supplements — the dashboard has no add-UI |
+| `useSupplementsToday()` | hook | `SupplementWithStatus[]` (`taken` from today's logs) |
+| `useToggleSupplement()` | mutation | `{id, taken}`; true upsert on `(supplement_id, log_date)` |
+
+### journal.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `fetchJournalEntries()` | query fn | newest-first; TipTap JSON in `content_json`, preview in `plain_text` |
+| `useJournalEntriesSync()` | hook | hydrates `store.journalEntries` |
+| `useAddJournalEntry()` | mutation | client-generated `id` + `createdAt`; stamps `mood` + `cyclePhase` |
+| `useUpdateJournalEntry()` | mutation | `{id, contentJSON, contentText, mood?}` |
+| `useDeleteJournalEntry()` | mutation | `(id)` |
+
+### reminders.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `fetchReminders()` / `useRemindersSync()` / `useUpdateReminders()` | as above | DB columns are `period_reminder`/`log_nudge`/`supplement_reminder`/`reminder_time` (`HH:MM:SS`) plus the master `enabled` flag (0006); `enabled` falls back to "any sub-toggle on" for pre-0006 rows |
+
+### chat.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `useChatHistory(persona)` | hook | messages of the latest session, oldest-first; `persona` is the shared `database.types.Persona`; `[]` when signed out or on any failure; `staleTime: Infinity, gcTime: 0` (load once). UI side: both personas render via `components/chat/PersonaChat.tsx` + `usePersonaChat` |
+
+### dev-seed.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `DEV_SEED_ENABLED` | const | `NEXT_PUBLIC_ENABLE_DEV_SEED === "true"` |
+| `useDevSeed()` | hook | inserts 30 days of cycle logs + 2 journal entries once, only when the user has zero logs; mounted by `DashboardView` |
+
+### export.ts
+
+| Export | Kind | Notes |
+|---|---|---|
+| `fetchUserDataExport()` | async | RLS-scoped JSON snapshot of every user table plus `version`/`exportedAt` |
+| `downloadUserDataExport(data)` | fn | triggers a `sakhi-export-YYYY-MM-DD.json` download |
+| `importUserDataExport(raw)` | async | validates a backup, remaps habit/supplement/session ids, upserts idempotently; returns `{imported, errors}` |
+
+### keys.ts
+
+```ts
+profile, cycleLogs, moodLogs, habits, habitLogs(date),
+supplements, supplementLogs(date), journalEntries, reminders,
+chatSessions(persona), chatMessages(sessionId)
+```
+
+## Supabase clients
+
+| File | Scope | Use for |
+|---|---|---|
+| `lib/supabase/client.ts` `createClient()` | browser | all `lib/data/*` reads/writes (RLS applies) |
+| `lib/supabase/server.ts` `createClient()` | server | chat route auth + RLS-scoped writes (cookie session) |
+| `lib/supabase/admin.ts` `createAdminClient()` | server only | health checks; `import "server-only"` fails the build if bundled client-side |
+
+## HTTP surface
+
+| Route | Method | Body | Responses |
+|---|---|---|---|
+| `/api/health` | GET | — | `{ok, connectivity, core: {missing[]}, rag: {missing[]}}`; 503 when core tables missing (probe via `PGRST205`) |
+| `/api/chat/[persona]` | POST | `{messages: [{role: "user"\|"assistant", content}]}` ≤40 msgs / 8000 chars | `{reply}`; 400 bad persona/body, 401 signed out, 500 save failure, 502 NIM failure |
+| `/auth/callback` | GET | `?code=&next=` | exchanges code → session cookie → redirect; else `/auth/auth-code-error` |
+
+`middleware.ts` refreshes the session on every non-static request.
+
+## Schema (`supabase/migrations/`)
+
+- **0001** — `profiles` (id = auth user id, `onboarded` flag), `reminder_preferences`, `cycle_logs` (unique `(user_id, log_date)`), `mood_logs`, `habits` + `habit_logs` (unique `(habit_id, log_date)`), `supplements` + `supplement_logs` (unique `(supplement_id, log_date)`), `journal_entries`, `chat_sessions` + `chat_messages`. All RLS `auth.uid() = user_id`, full self-access.
+- **0002** — `documents`, `document_chunks` (`embedding vector(2048)`), authenticated-read-only RLS, `match_document_chunks(vector, count)` RPC returning `(id, content, similarity)`. No vector index (see architecture.md).
+- **0003** — `habit_logs.value numeric` for quantitative metrics.
+- **0004** — integrity: `mood_logs` unique `(user_id, log_date)`; `habit_logs`/`supplement_logs` gain `created_at`/`updated_at` + update triggers; lookup indexes; timestamp columns `NOT NULL`; `mood` constrained to the 10 UI ids and `cycle_phase` normalized from display names to ids (`menstrual`/`follicular`/`ovulatory`/`luteal`) then constrained. `journal_entries.cycle_phase` now stores the phase **id**; the UI maps it back via `getPhaseName()` (`lib/cycle.ts`).
+- **0005** — `habits` unique `(user_id, name)` (dedupes first, repointing/trimming `habit_logs`) — fixes PGRST116 from duplicate water/habit rows created by the old select-then-insert race.
+- **0006** — `reminder_preferences.enabled boolean not null default false` (backfilled as "any sub-toggle on") so the Settings master switch persists.
+
+Hand-maintained TS mirrors live in `lib/data/database.types.ts` (regenerate
+via `supabase gen types` once the CLI is linked).
+
+## Environment
+
+| Variable | Exposure | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | client | project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client | RLS-scoped data access |
+| `SUPABASE_SERVICE_ROLE_KEY` | server only | health probes, ingestion (bypasses RLS) |
+| `NVIDIA_NIM_API_KEY` | server only | chat + embeddings |
+| `NVIDIA_NIM_MODEL` | server only | global chat model override (per-persona default `nvidia/nemotron-3-ultra-550b-a55b` in `lib/personas.ts`) |
+| `NVIDIA_NIM_FALLBACK_MODEL` | server only | retried once when the primary NIM call fails (default `nvidia/nemotron-3-super-120b-a12b`) |
+| `NVIDIA_NIM_REASONING_EFFORT` | server only | optional `low`/`high`/`max` override (defaults: Sakhi `low`, Maya `high`; `medium` is rejected by NIM) |
+| `NEXT_PUBLIC_ENABLE_DEV_SEED` | client | `"true"` enables mock seeding for new users |
+
+Template: `.env.example`. Never commit `.env.local`.
