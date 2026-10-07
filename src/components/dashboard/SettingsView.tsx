@@ -334,11 +334,24 @@ export default function SettingsView() {
             Data Operations
           </h2>
           
-          <p className="text-xs text-ink-soft leading-relaxed">
-            Your data is stored in your private account, protected by row-level security. Export downloads a JSON copy of your data, and import restores a backup.
-          </p>
+<p className="text-xs text-ink-soft leading-relaxed">
+   Your data is stored in your private account, protected by row-level security. Export downloads a JSON copy of your data, and import restores a backup.
+   </p>
 
-          <div className="flex flex-wrap gap-2.5 pt-2">
+   <p className="text-xs text-ink-soft leading-relaxed">
+   For any feedback,{" "}
+   <a
+   href="https://forms.gle/UKfALr4rcBfipwPv5"
+   target="_blank"
+   rel="noopener noreferrer"
+   className="font-semibold text-sakura-deep underline underline-offset-2 hover:text-plum transition-colors"
+   >
+   click here
+   </a>
+   .
+   </p>
+   
+   <div className="flex flex-wrap gap-2.5 pt-2">
             <GlassButton variant="secondary" type="button" onClick={handleExport} disabled={exporting}>
               {exporting ? "Exporting..." : "Export Decrypted JSON"}
             </GlassButton>
